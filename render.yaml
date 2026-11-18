@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: math-pbl-api
+    runtime: node
+    plan: free
+    region: singapore
+    buildCommand: npm ci
+    startCommand: node server/src/index.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: CORS_ORIGIN
+        value: https://lll123-design.github.io

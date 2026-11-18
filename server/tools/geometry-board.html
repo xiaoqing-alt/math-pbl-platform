@@ -1,0 +1,542 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>动态几何画板</title>
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    padding:14px 14px 18px;background:#fff;color:#1f2430;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    font-size:14px;line-height:1.6;overflow-x:hidden;
+  }
+  h1{margin:0 0 4px;font-size:16px;font-weight:600;color:#171c28}
+  .sub{margin:0 0 12px;font-size:12px;color:#7b8397;line-height:1.5}
+  .card{margin-bottom:10px;padding:12px;border:1px solid #e7eaf3;border-radius:12px;background:#fff}
+  .card-title{margin-bottom:8px;font-size:13px;font-weight:600;color:#2a3142}
+  .toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;margin-bottom:10px}
+  .seg{display:inline-flex;padding:3px;border-radius:9px;background:#f2f5fc}
+  .segbtn{
+    border:0;background:transparent;color:#5a6478;font-family:inherit;font-size:12px;
+    padding:6px 10px;border-radius:7px;cursor:pointer;white-space:nowrap;transition:background .15s,color .15s;
+  }
+  .segbtn.active{background:#4f6ef7;color:#fff}
+  .checks{display:flex;flex-wrap:wrap;gap:10px}
+  .checks label{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:#4a5268;cursor:pointer;white-space:nowrap}
+  .checks input{width:14px;height:14px;margin:0;accent-color:#4f6ef7}
+  .stage{border:1px solid #eef1f9;border-radius:10px;overflow:hidden;background:#fbfcff}
+  svg{display:block;width:100%;height:auto;touch-action:none;user-select:none;-webkit-user-select:none}
+  .vertex-hit{cursor:grab;touch-action:none}
+  .vertex-hit.active{cursor:grabbing}
+  .lbl{
+    font-size:11px;fill:#3b55d9;text-anchor:middle;dominant-baseline:middle;
+    paint-order:stroke;stroke:#fff;stroke-width:3px;stroke-linejoin:round;pointer-events:none;
+  }
+  .angle-lbl{
+    font-size:10.5px;fill:#b4581c;text-anchor:middle;dominant-baseline:middle;
+    paint-order:stroke;stroke:#fff;stroke-width:3px;stroke-linejoin:round;pointer-events:none;
+  }
+  .vletter{font-size:12px;font-weight:700;fill:#4f6ef7;text-anchor:middle;dominant-baseline:middle;pointer-events:none}
+  .tip{margin:8px 0 0;font-size:12px;color:#8a91a4;line-height:1.5}
+  .metric-line{display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;min-width:0}
+  .k{flex:none;width:32px;font-size:12px;color:#7b8397;line-height:1.7}
+  .v{flex:1 1 auto;min-width:0;font-size:12.5px;color:#2c3550;line-height:1.7;word-break:break-word}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .stat{min-width:0;padding:8px 9px;border-radius:10px;background:#f6f8fe}
+  .stat span{display:block;font-size:11.5px;color:#7b8397}
+  .stat strong{display:block;font-size:14.5px;font-weight:600;color:#2c3550;word-break:break-all}
+  .note{margin:9px 0 0;padding:6px 9px;border-radius:8px;background:#f2f5ff;color:#3b55d9;font-size:12px;line-height:1.5}
+  .actions{display:flex;gap:8px;margin-top:2px}
+  .btn{
+    flex:1 1 0;height:38px;border-radius:10px;border:1px solid transparent;font-family:inherit;
+    font-size:13px;font-weight:500;cursor:pointer;transition:background .15s,border-color .15s;
+  }
+  .btn-primary{background:#4f6ef7;color:#fff}
+  .btn-primary:hover{background:#4361e3}
+  .btn-ghost{background:#fff;border-color:#dfe4ef;color:#3c455c}
+  .btn-ghost:hover{border-color:#b9c2d8;background:#fafbff}
+  .status{min-height:18px;margin:8px 0 0;font-size:12px;color:#8a91a4;text-align:center}
+  .status.ok{color:#1f8a5a}
+</style>
+</head>
+<body>
+  <h1>动态几何画板</h1>
+  <p class="sub">拖动顶点改变图形，实时观察边长、角度与面积的变化。</p>
+
+  <div class="card">
+    <div class="toolbar">
+      <div class="seg" id="shapeSeg">
+        <button class="segbtn active" type="button" data-shape="tri">三角形</button>
+        <button class="segbtn" type="button" data-shape="quad">四边形</button>
+      </div>
+      <div class="checks">
+        <label><input type="checkbox" id="cbLen" checked />显示边长</label>
+        <label><input type="checkbox" id="cbAng" checked />显示角度</label>
+        <label><input type="checkbox" id="cbArea" checked />显示面积</label>
+      </div>
+    </div>
+    <div class="stage">
+      <svg id="board" viewBox="0 0 320 260" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="可拖动顶点的动态几何图形">
+        <defs>
+          <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+            <path d="M20 0 H0 V20" fill="none" stroke="#e9edf8" stroke-width="1" />
+          </pattern>
+        </defs>
+        <rect x="0" y="0" width="320" height="260" fill="url(#grid)" />
+        <polygon id="poly" points="" fill="rgba(79,110,247,0.10)" stroke="#4f6ef7" stroke-width="1.6" stroke-linejoin="round" />
+        <g id="edgeLayer"></g>
+        <g id="angleLayer"></g>
+        <text id="areaLabel" class="lbl" text-anchor="middle" dominant-baseline="middle"></text>
+        <g id="vertLayer"></g>
+      </svg>
+    </div>
+    <p class="tip">拖动顶点，观察内角和是否变化；试试让三角形变成直角三角形。</p>
+  </div>
+
+  <div class="card">
+    <div class="card-title">实时测量</div>
+    <div class="metric-line"><span class="k">边长</span><span class="v" id="sideText">—</span></div>
+    <div class="metric-line"><span class="k">内角</span><span class="v" id="angleText">—</span></div>
+    <div class="grid">
+      <div class="stat"><span>内角和</span><strong id="sumVal">—</strong></div>
+      <div class="stat"><span>周长</span><strong id="perVal">—</strong></div>
+      <div class="stat"><span>面积</span><strong id="areaVal">—</strong></div>
+    </div>
+    <p class="note" id="shapeNote">拖动顶点开始探究。</p>
+  </div>
+
+  <div class="actions">
+    <button id="appendBtn" class="btn btn-primary" type="button">写入我的作答</button>
+    <button id="resetBtn" class="btn btn-ghost" type="button">重置</button>
+  </div>
+  <p id="status" class="status" role="status"></p>
+
+<script>
+(function () {
+  'use strict';
+
+  var NS = 'http://www.w3.org/2000/svg';
+  var W = 320, H = 260;
+  var MIN = 16;
+
+  var board = document.getElementById('board');
+  var polyEl = document.getElementById('poly');
+  var edgeLayer = document.getElementById('edgeLayer');
+  var angleLayer = document.getElementById('angleLayer');
+  var areaLabel = document.getElementById('areaLabel');
+  var vertLayer = document.getElementById('vertLayer');
+  var sideText = document.getElementById('sideText');
+  var angleText = document.getElementById('angleText');
+  var sumVal = document.getElementById('sumVal');
+  var perVal = document.getElementById('perVal');
+  var areaVal = document.getElementById('areaVal');
+  var shapeNote = document.getElementById('shapeNote');
+  var statusEl = document.getElementById('status');
+  var cbLen = document.getElementById('cbLen');
+  var cbAng = document.getElementById('cbAng');
+  var cbArea = document.getElementById('cbArea');
+
+  var DEFAULT = {
+    tri: [{ x: 62, y: 198 }, { x: 258, y: 198 }, { x: 158, y: 58 }],
+    quad: [{ x: 58, y: 62 }, { x: 262, y: 86 }, { x: 246, y: 206 }, { x: 70, y: 192 }]
+  };
+
+  var state = {
+    shape: 'tri',
+    pts: clone(DEFAULT.tri),
+    drag: -1,
+    refs: null
+  };
+
+  function clone(pts) {
+    return pts.map(function (p) { return { x: p.x, y: p.y }; });
+  }
+
+  function svgEl(tag, attrs) {
+    var el = document.createElementNS(NS, tag);
+    if (attrs) {
+      Object.keys(attrs).forEach(function (k) { el.setAttribute(k, attrs[k]); });
+    }
+    return el;
+  }
+
+  function clamp(v, lo, hi) {
+    return Math.max(lo, Math.min(hi, v));
+  }
+
+  function fmt1(n) {
+    var v = Math.round(n * 10) / 10;
+    if (v === 0) v = 0;
+    return v.toFixed(1);
+  }
+
+  function dist(a, b) {
+    var dx = b.x - a.x, dy = b.y - a.y;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  function areaOf(pts) {
+    var s = 0;
+    for (var i = 0; i < pts.length; i++) {
+      var j = (i + 1) % pts.length;
+      s += pts[i].x * pts[j].y - pts[j].x * pts[i].y;
+    }
+    return Math.abs(s) / 2;
+  }
+
+  function orientOf(pts) {
+    var s = 0;
+    for (var i = 0; i < pts.length; i++) {
+      var j = (i + 1) % pts.length;
+      s += pts[i].x * pts[j].y - pts[j].x * pts[i].y;
+    }
+    return s > 0 ? 1 : (s < 0 ? -1 : 0);
+  }
+
+  function centroidOf(pts) {
+    var x = 0, y = 0;
+    pts.forEach(function (p) { x += p.x; y += p.y; });
+    return { x: x / pts.length, y: y / pts.length };
+  }
+
+  function vertexAngle(pts, i, orient) {
+    var n = pts.length;
+    var cur = pts[i];
+    var prev = pts[(i - 1 + n) % n];
+    var next = pts[(i + 1) % n];
+    var ux = prev.x - cur.x, uy = prev.y - cur.y;
+    var vx = next.x - cur.x, vy = next.y - cur.y;
+    var lu = Math.sqrt(ux * ux + uy * uy);
+    var lv = Math.sqrt(vx * vx + vy * vy);
+    if (!lu || !lv) {
+      return { deg: 0, a1: 0, sweep: 0, mid: 0, concave: false };
+    }
+    var dot = (ux * vx + uy * vy) / (lu * lv);
+    dot = Math.max(-1, Math.min(1, dot));
+    var small = Math.acos(dot);
+    var cross = ux * vy - uy * vx;
+    var concave = cross * orient > 0;
+    var interior = concave ? Math.PI * 2 - small : small;
+
+    var a1 = Math.atan2(uy, ux);
+    var a2 = Math.atan2(vy, vx);
+    var diff = a2 - a1;
+    while (diff > Math.PI) diff -= Math.PI * 2;
+    while (diff < -Math.PI) diff += Math.PI * 2;
+    var dir = diff >= 0 ? 1 : -1;
+    if (concave) dir = -dir;
+
+    return {
+      deg: interior * 180 / Math.PI,
+      a1: a1,
+      sweep: dir * interior,
+      mid: a1 + dir * interior / 2,
+      concave: concave
+    };
+  }
+
+  function arcPath(cx, cy, r, a1, sweep) {
+    var steps = Math.max(10, Math.round(Math.abs(sweep) / (Math.PI / 36)));
+    var d = '';
+    for (var i = 0; i <= steps; i++) {
+      var a = a1 + sweep * (i / steps);
+      var x = cx + r * Math.cos(a);
+      var y = cy + r * Math.sin(a);
+      d += (i === 0 ? 'M' : 'L') + x.toFixed(2) + ' ' + y.toFixed(2);
+    }
+    return d;
+  }
+
+  function toSvg(evt) {
+    var pt = board.createSVGPoint();
+    pt.x = evt.clientX;
+    pt.y = evt.clientY;
+    var m = board.getScreenCTM();
+    if (!m) return { x: 0, y: 0 };
+    var p = pt.matrixTransform(m.inverse());
+    return { x: p.x, y: p.y };
+  }
+
+  function buildScene() {
+    while (edgeLayer.firstChild) edgeLayer.removeChild(edgeLayer.firstChild);
+    while (angleLayer.firstChild) angleLayer.removeChild(angleLayer.firstChild);
+    while (vertLayer.firstChild) vertLayer.removeChild(vertLayer.firstChild);
+
+    var n = state.pts.length;
+    var refs = { edges: [], angles: [], hits: [] };
+    var i;
+
+    for (i = 0; i < n; i++) {
+      var label = svgEl('text', { 'class': 'lbl' });
+      edgeLayer.appendChild(label);
+      refs.edges.push({ a: i, b: (i + 1) % n, el: label });
+    }
+
+    for (i = 0; i < n; i++) {
+      var arc = svgEl('path', {
+        fill: 'none', stroke: '#f0a35e', 'stroke-width': '1.4',
+        'stroke-linecap': 'round', 'pointer-events': 'none'
+      });
+      var angText = svgEl('text', { 'class': 'angle-lbl' });
+      angleLayer.appendChild(arc);
+      angleLayer.appendChild(angText);
+      refs.angles.push({ i: i, arc: arc, text: angText });
+    }
+
+    for (i = 0; i < n; i++) {
+      var g = svgEl('g', { 'class': 'vertex-hit' });
+      var hit = svgEl('circle', { r: 18, fill: 'transparent', 'pointer-events': 'all' });
+      var dot = svgEl('circle', {
+        r: 7, fill: '#fff', stroke: '#4f6ef7', 'stroke-width': '2.5', 'pointer-events': 'none'
+      });
+      var letter = svgEl('text', { 'class': 'vletter' });
+      g.appendChild(hit);
+      g.appendChild(dot);
+      g.appendChild(letter);
+      vertLayer.appendChild(g);
+      refs.hits.push({ group: g, hit: hit, dot: dot, letter: letter });
+
+      bindDrag(i, hit);
+    }
+
+    state.refs = refs;
+  }
+
+  function bindDrag(idx, hit) {
+    hit.addEventListener('pointerdown', function (ev) {
+      ev.preventDefault();
+      state.drag = idx;
+      hit.classList.add('active');
+      try { hit.setPointerCapture(ev.pointerId); } catch (err) {}
+      render();
+    });
+
+    hit.addEventListener('pointermove', function (ev) {
+      if (state.drag !== idx) return;
+      ev.preventDefault();
+      var p = toSvg(ev);
+      state.pts[idx].x = clamp(p.x, MIN, W - MIN);
+      state.pts[idx].y = clamp(p.y, MIN, H - MIN);
+      render();
+    });
+
+    function end(ev) {
+      if (state.drag !== idx) return;
+      state.drag = -1;
+      hit.classList.remove('active');
+      try {
+        if (hit.hasPointerCapture(ev.pointerId)) hit.releasePointerCapture(ev.pointerId);
+      } catch (err) {}
+    }
+
+    hit.addEventListener('pointerup', end);
+    hit.addEventListener('pointercancel', end);
+    hit.addEventListener('lostpointercapture', end);
+  }
+
+  function angleNames(n) {
+    return n === 3 ? ['A', 'B', 'C'] : ['A', 'B', 'C', 'D'];
+  }
+
+  function render() {
+    var pts = state.pts;
+    var n = pts.length;
+    var names = angleNames(n);
+    var refs = state.refs;
+    if (!refs) return;
+
+    var orient = orientOf(pts);
+    var centroid = centroidOf(pts);
+    var sides = [];
+    var perimeter = 0;
+    var i;
+
+    for (i = 0; i < n; i++) {
+      var len = dist(pts[i], pts[(i + 1) % n]);
+      sides.push(len);
+      perimeter += len;
+    }
+
+    polyEl.setAttribute('points', pts.map(function (p) {
+      return p.x.toFixed(1) + ',' + p.y.toFixed(1);
+    }).join(' '));
+
+    refs.edges.forEach(function (ref) {
+      var a = pts[ref.a], b = pts[ref.b];
+      var mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      var dx = mid.x - centroid.x, dy = mid.y - centroid.y;
+      var d = Math.sqrt(dx * dx + dy * dy) || 1;
+      var off = 13;
+      ref.el.setAttribute('x', (mid.x + dx / d * off).toFixed(1));
+      ref.el.setAttribute('y', (mid.y + dy / d * off).toFixed(1));
+      ref.el.textContent = names[ref.a] + names[ref.b] + '=' + fmt1(sides[ref.a]);
+    });
+
+    var angles = [];
+    var sum = 0;
+    for (i = 0; i < n; i++) {
+      var ang = vertexAngle(pts, i, orient);
+      angles.push(ang);
+      sum += ang.deg;
+    }
+
+    refs.angles.forEach(function (ref) {
+      var ang = angles[ref.i];
+      var p = pts[ref.i];
+      ref.arc.setAttribute('d', arcPath(p.x, p.y, 22, ang.a1, ang.sweep));
+      var lr = 33;
+      ref.text.setAttribute('x', (p.x + lr * Math.cos(ang.mid)).toFixed(1));
+      ref.text.setAttribute('y', (p.y + lr * Math.sin(ang.mid)).toFixed(1));
+      ref.text.textContent = fmt1(ang.deg) + '°';
+    });
+
+    refs.hits.forEach(function (ref, idx) {
+      var p = pts[idx];
+      ref.hit.setAttribute('cx', p.x);
+      ref.hit.setAttribute('cy', p.y);
+      ref.dot.setAttribute('cx', p.x);
+      ref.dot.setAttribute('cy', p.y);
+      var dx = p.x - centroid.x, dy = p.y - centroid.y;
+      var d = Math.sqrt(dx * dx + dy * dy) || 1;
+      ref.letter.setAttribute('x', (p.x + dx / d * 17).toFixed(1));
+      ref.letter.setAttribute('y', (p.y + dy / d * 17).toFixed(1));
+      ref.letter.textContent = names[idx];
+    });
+
+    var area = areaOf(pts);
+    areaLabel.setAttribute('x', centroid.x.toFixed(1));
+    areaLabel.setAttribute('y', centroid.y.toFixed(1));
+    areaLabel.textContent = '面积=' + fmt1(area);
+
+    edgeLayer.style.display = cbLen.checked ? '' : 'none';
+    angleLayer.style.display = cbAng.checked ? '' : 'none';
+    areaLabel.style.display = cbArea.checked ? '' : 'none';
+
+    var sideLine = sides.map(function (len, idx) {
+      return names[idx] + names[(idx + 1) % n] + '=' + fmt1(len);
+    }).join('，');
+    var angleLine = angles.map(function (a, idx) {
+      return '∠' + names[idx] + '=' + fmt1(a.deg) + '°';
+    }).join('，');
+
+    sideText.textContent = sideLine;
+    angleText.textContent = angleLine;
+    sumVal.textContent = fmt1(sum) + '°';
+    perVal.textContent = fmt1(perimeter);
+    areaVal.textContent = fmt1(area);
+
+    if (n === 3) {
+      var hasRight = angles.some(function (a) { return Math.abs(a.deg - 90) <= 0.6; });
+      var hasObtuse = angles.some(function (a) { return a.deg > 90.6; });
+      if (hasRight) {
+        shapeNote.textContent = '当前是直角三角形：有一个内角约为 90°。';
+      } else if (hasObtuse) {
+        shapeNote.textContent = '当前是钝角三角形：有一个内角大于 90°。';
+      } else {
+        shapeNote.textContent = '当前是锐角三角形：三个内角都小于 90°。';
+      }
+    } else {
+      var concave = angles.some(function (a) { return a.concave; });
+      shapeNote.textContent = concave
+        ? '当前是凹四边形：有一个内角大于 180°。'
+        : '当前是凸四边形：四个内角都小于 180°，内角和为 360°。';
+    }
+  }
+
+  function buildRecord() {
+    var pts = state.pts;
+    var n = pts.length;
+    var names = angleNames(n);
+    var orient = orientOf(pts);
+    var sides = [];
+    var perimeter = 0;
+    var angles = [];
+    var sum = 0;
+    for (var i = 0; i < n; i++) {
+      var len = dist(pts[i], pts[(i + 1) % n]);
+      sides.push(len);
+      perimeter += len;
+      var ang = vertexAngle(pts, i, orient);
+      angles.push(ang.deg);
+      sum += ang.deg;
+    }
+    var sideLine = sides.map(function (len, idx) {
+      return names[idx] + names[(idx + 1) % n] + '=' + fmt1(len);
+    }).join('，');
+    var angleLine = angles.map(function (deg, idx) {
+      return '∠' + names[idx] + '=' + fmt1(deg) + '°';
+    }).join('，');
+
+    return [
+      '动态几何探究记录',
+      '图形：' + (n === 3 ? '三角形' : '四边形'),
+      '边长：' + sideLine,
+      '内角：' + angleLine + '，内角和=' + fmt1(sum) + '°',
+      '周长=' + fmt1(perimeter) + '，面积=' + fmt1(areaOf(pts)),
+      '我的发现：（请补充）'
+    ].join('\n');
+  }
+
+  function setStatus(msg, ok) {
+    statusEl.textContent = msg;
+    statusEl.className = 'status' + (ok ? ' ok' : '');
+  }
+
+  function updateShapeButtons() {
+    var buttons = document.querySelectorAll('#shapeSeg .segbtn');
+    Array.prototype.forEach.call(buttons, function (btn) {
+      btn.classList.toggle('active', btn.getAttribute('data-shape') === state.shape);
+    });
+  }
+
+  function setShape(shape) {
+    if (state.shape === shape) return;
+    state.shape = shape;
+    state.pts = clone(DEFAULT[shape]);
+    state.drag = -1;
+    updateShapeButtons();
+    buildScene();
+    render();
+    setStatus('');
+  }
+
+  document.getElementById('shapeSeg').addEventListener('click', function (ev) {
+    var btn = ev.target.closest ? ev.target.closest('.segbtn') : null;
+    if (!btn) return;
+    setShape(btn.getAttribute('data-shape'));
+  });
+
+  [cbLen, cbAng, cbArea].forEach(function (cb) {
+    cb.addEventListener('change', render);
+  });
+
+  document.getElementById('appendBtn').addEventListener('click', function () {
+    try {
+      window.parent.postMessage({ type: 'pbl-append', text: buildRecord() }, '*');
+      setStatus('已写入，请回到作答区查看', true);
+    } catch (err) {
+      setStatus('写入失败，请稍后再试', false);
+    }
+  });
+
+  document.getElementById('resetBtn').addEventListener('click', function () {
+    state.shape = 'tri';
+    state.pts = clone(DEFAULT.tri);
+    state.drag = -1;
+    cbLen.checked = true;
+    cbAng.checked = true;
+    cbArea.checked = true;
+    updateShapeButtons();
+    buildScene();
+    render();
+    setStatus('');
+  });
+
+  buildScene();
+  render();
+})();
+</script>
+</body>
+</html>

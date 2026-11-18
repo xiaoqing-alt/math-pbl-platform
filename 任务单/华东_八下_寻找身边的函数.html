@@ -1,0 +1,2001 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>寻找身边的函数 · 项目学习任务单</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#4F46E5',
+                        secondary: '#06B6D4',
+                        accent: '#8B5CF6'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            background: linear-gradient(135deg, #f0f4ff 0%, #faf5ff 100%);
+            min-height: 100vh;
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+        .step-card {
+            transition: all 0.3s ease;
+        }
+        .step-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px -5px rgba(79, 70, 229, 0.1);
+        }
+        .section-header {
+            background: linear-gradient(90deg, #4F46E5 0%, #06B6D4 100%);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px 8px 0 0;
+            font-weight: 600;
+        }
+        .form-input {
+            width: 100%;
+            border: 1px solid #D1D5DB;
+            border-radius: 6px;
+            padding: 8px 12px;
+            transition: all 0.2s;
+            outline: none;
+            font-size: 14px;
+        }
+        .form-input:focus {
+            border-color: #4F46E5;
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+        .form-input::placeholder {
+            color: #9CA3AF;
+        }
+
+        /* ========== 自定义下拉日历 ========== */
+        .date-picker-wrapper {
+            position: relative;
+            width: 100%;
+            height: 38px;
+        }
+        .date-picker-wrapper .date-input-display {
+            width: 100%;
+            height: 100%;
+            border: 1px solid #D1D5DB;
+            border-radius: 6px;
+            padding: 0 12px;
+            font-size: 14px;
+            background: #fff;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            color: #111827;
+            transition: border-color 0.2s;
+        }
+        .date-picker-wrapper .date-input-display:hover {
+            border-color: #4F46E5;
+        }
+        .date-picker-wrapper .date-input-display .placeholder {
+            color: #9CA3AF;
+        }
+        .date-picker-wrapper .date-input-display .clear-btn {
+            margin-left: auto;
+            background: none;
+            border: none;
+            color: #9CA3AF;
+            cursor: pointer;
+            font-size: 16px;
+            padding: 0 4px;
+        }
+        .date-picker-wrapper .date-input-display .clear-btn:hover {
+            color: #EF4444;
+        }
+
+        .calendar-popup {
+            position: absolute;
+            top: 42px;
+            left: 0;
+            width: 280px;
+            background: #ffffff;
+            border: 1px solid #D1D5DB;
+            border-radius: 10px;
+            box-shadow: 0 12px 30px rgba(0,0,0,0.15);
+            z-index: 999;
+            padding: 16px 14px 12px;
+            display: none;
+            font-size: 14px;
+        }
+        .calendar-popup.open {
+            display: block;
+        }
+        .calendar-popup .cal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            font-weight: 600;
+            color: #1F2937;
+        }
+        .calendar-popup .cal-header button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 18px;
+            color: #6B7280;
+            padding: 0 6px;
+            border-radius: 4px;
+            transition: background 0.1s;
+        }
+        .calendar-popup .cal-header button:hover {
+            background: #F3F4F6;
+        }
+        .calendar-popup .cal-header .month-year {
+            min-width: 120px;
+            text-align: center;
+        }
+        .calendar-popup .weekdays {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            text-align: center;
+            font-size: 12px;
+            color: #6B7280;
+            font-weight: 500;
+            margin-bottom: 6px;
+        }
+        .calendar-popup .days-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 2px;
+        }
+        .calendar-popup .days-grid .day-cell {
+            aspect-ratio: 1/1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: background 0.1s;
+            font-size: 14px;
+            color: #1F2937;
+            background: transparent;
+            border: none;
+            font-weight: 400;
+            width: 100%;
+            padding: 0;
+        }
+        .calendar-popup .days-grid .day-cell:hover {
+            background: #EEF2FF;
+        }
+        .calendar-popup .days-grid .day-cell.selected {
+            background: #4F46E5;
+            color: white;
+            font-weight: 500;
+        }
+        .calendar-popup .days-grid .day-cell.other-month {
+            color: #D1D5DB;
+        }
+        .calendar-popup .days-grid .day-cell.today {
+            border: 1px solid #4F46E5;
+        }
+        .calendar-popup .cal-footer {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 12px;
+            padding-top: 10px;
+            border-top: 1px solid #F3F4F6;
+        }
+        .calendar-popup .cal-footer button {
+            background: none;
+            border: none;
+            font-size: 13px;
+            cursor: pointer;
+            padding: 4px 12px;
+            border-radius: 4px;
+            color: #4F46E5;
+            font-weight: 500;
+            transition: background 0.1s;
+        }
+        .calendar-popup .cal-footer button:hover {
+            background: #EEF2FF;
+        }
+        .calendar-popup .cal-footer .btn-clear {
+            color: #EF4444;
+        }
+        .calendar-popup .cal-footer .btn-clear:hover {
+            background: #FEF2F2;
+        }
+
+        .btn {
+            padding: 7px 16px;
+            border-radius: 6px;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+            font-size: 14px;
+        }
+        .btn-primary {
+            background: linear-gradient(90deg, #4F46E5, #7C3AED);
+            color: white;
+        }
+        .btn-primary:hover { filter: brightness(1.1); }
+        .btn-danger {
+            background-color: #EF4444;
+            color: white;
+        }
+        .btn-danger:hover { background-color: #DC2626; }
+        .btn-outline {
+            border: 1px solid #4F46E5;
+            color: #4F46E5;
+            background: white;
+        }
+        .btn-outline:hover { background: #EEF2FF; }
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+        }
+        .data-table th, .data-table td {
+            border: 1px solid #E5E7EB;
+            padding: 8px 10px;
+            text-align: center;
+            font-size: 14px;
+            vertical-align: middle;
+        }
+        .data-table th {
+            background-color: #F3F4F6;
+            font-weight: 600;
+            color: #374151;
+        }
+        .tip-box {
+            background: #F0F9FF;
+            border-left: 4px solid #0EA5E9;
+            padding: 10px 15px;
+            border-radius: 0 6px 6px 0;
+            font-size: 13px;
+            color: #0369A1;
+            margin: 10px 0;
+            line-height: 1.5;
+        }
+        .collapse-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.4s ease-out;
+        }
+        .collapse-content.open { max-height: 6000px; }
+        .step-number {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #4F46E5, #8B5CF6);
+            color: white;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 10px;
+            flex-shrink: 0;
+        }
+        .graph-canvas {
+            background: #ffffff;
+            border: 1px solid #D1D5DB;
+            border-radius: 6px;
+            cursor: crosshair;
+            width: 100%;
+            height: 420px;
+            display: block;
+        }
+        .tool-panel {
+            background: #F9FAFB;
+            padding: 12px;
+            border-radius: 6px;
+            margin-top: 10px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+            row-gap: 12px;
+        }
+        .tool-panel .config-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            color: #4B5563;
+        }
+        .tool-panel .config-group input {
+            width: 70px;
+            padding: 5px 8px;
+            border: 1px solid #D1D5DB;
+            border-radius: 4px;
+            font-size: 13px;
+            outline: none;
+        }
+        .fit-select {
+            padding: 7px 10px;
+            border-radius: 6px;
+            border: 1px solid #D1D5DB;
+            font-size: 14px;
+            outline: none;
+        }
+        .fit-result {
+            margin-left: auto;
+            padding: 6px 12px;
+            background: white;
+            border: 1px solid #E5E7EB;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            color: #4F46E5;
+            font-size: 14px;
+            min-width: 200px;
+            text-align: center;
+        }
+        .upload-box {
+            border: 2px dashed #D1D5DB;
+            border-radius: 8px;
+            padding: 24px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: #6B7280;
+        }
+        .upload-box:hover {
+            border-color: #4F46E5;
+            background: #EEF2FF;
+            color: #4F46E5;
+        }
+        .upload-box input { display: none; }
+        .preview-img, .preview-video {
+            max-width: 100%;
+            max-height: 280px;
+            margin-top: 10px;
+            border-radius: 6px;
+            border: 1px solid #E5E7EB;
+        }
+        .play-option {
+            border: 1px solid #E5E7EB;
+            border-radius: 6px;
+            padding: 8px;
+            text-align: center;
+            background: #F9FAFB;
+        }
+        .play-option i {
+            font-size: 16px;
+            color: #8B5CF6;
+            margin-bottom: 2px;
+        }
+        .play-option p {
+            font-size: 12px;
+            font-weight: 500;
+            margin: 2px 0;
+        }
+        .play-option span {
+            font-size: 10px;
+            color: #6B7280;
+        }
+        .radio-score label {
+            display: inline-flex;
+            align-items: center;
+            margin-right: 12px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        @media print {
+            .no-print { display: none !important; }
+            body { background: white; }
+            .step-card { box-shadow: none; border: 1px solid #ccc; }
+        }
+        /* 项目简介 - 统一风格 */
+        .proj-intro-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+        }
+        .proj-intro-grid .intro-item {
+            background: #F8FAFC;
+            border-radius: 8px;
+            padding: 14px 18px;
+            border: 1px solid #E5E7EB;
+        }
+        .proj-intro-grid .intro-item h4 {
+            font-weight: 600;
+            color: #374151;
+            font-size: 0.95rem;
+            margin-bottom: 4px;
+        }
+        .proj-intro-grid .intro-item p, .proj-intro-grid .intro-item ul {
+            font-size: 0.9rem;
+            color: #4B5563;
+            line-height: 1.6;
+        }
+        .proj-intro-grid .intro-item ul {
+            list-style: disc;
+            padding-left: 18px;
+            margin: 2px 0;
+        }
+        .knowledge-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 4px;
+        }
+        .knowledge-tags span {
+            background: #EEF2FF;
+            color: #4338CA;
+            font-size: 0.75rem;
+            padding: 2px 12px;
+            border-radius: 20px;
+            font-weight: 500;
+        }
+        @media (max-width: 640px) {
+            .proj-intro-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body class="py-6 px-4">
+    <div class="max-w-6xl mx-auto">
+        <!-- 标题区 -->
+        <header class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">寻找身边的函数</h1>
+            <p class="text-gray-500">跨学科探究 · 体育与音乐中的函数关系</p>
+            <div class="flex justify-center gap-3 mt-4 no-print">
+                <button class="btn btn-outline" onclick="saveData()">
+                    <i class="fa fa-save mr-1"></i> 保存进度
+                </button>
+                <button class="btn btn-outline" onclick="window.print()">
+                    <i class="fa fa-print mr-1"></i> 打印导出
+                </button>
+                <button class="btn btn-outline" onclick="clearAll()">
+                    <i class="fa fa-trash-o mr-1"></i> 清空重置
+                </button>
+                <button class="btn btn-primary" onclick="submitTask()">
+                    <i class="fa fa-paper-plane mr-1"></i> 提交任务单
+                </button>
+            </div>
+        </header>
+
+        <!-- 基础信息（去掉了序号"一、"） -->
+        <section class="step-card bg-white rounded-lg shadow-md mb-6">
+            <div class="section-header flex items-center">
+                <i class="fa fa-user-circle mr-2"></i> 基础信息
+            </div>
+            <div class="p-5">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 33%;">姓名</th>
+                            <th style="width: 33%;">班级</th>
+                            <th style="width: 34%;">填写日期</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><input type="text" class="form-input" id="stuName" placeholder="请输入姓名"></td>
+                            <td><input type="text" class="form-input" id="stuClass" placeholder="请输入班级"></td>
+                            <td>
+                                <div class="date-picker-wrapper" id="datePickerWrapper">
+                                    <div class="date-input-display" id="dateDisplay" onclick="toggleCalendar()">
+                                        <span id="dateDisplayText" class="placeholder">年 / 月 / 日</span>
+                                        <button class="clear-btn" onclick="event.stopPropagation(); clearDate();">✕</button>
+                                    </div>
+                                    <div class="calendar-popup" id="calendarPopup">
+                                        <div class="cal-header">
+                                            <button onclick="changeMonth(-1)">‹</button>
+                                            <span class="month-year" id="calMonthYear">2026年 8月</span>
+                                            <button onclick="changeMonth(1)">›</button>
+                                        </div>
+                                        <div class="weekdays">
+                                            <span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span>
+                                        </div>
+                                        <div class="days-grid" id="daysGrid"></div>
+                                        <div class="cal-footer">
+                                            <button onclick="selectToday()">今天</button>
+                                            <button class="btn-clear" onclick="clearDate();">清除</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h4 class="font-semibold text-gray-700 mt-4 mb-2">
+                    <i class="fa fa-users text-primary mr-1"></i> 团队分工
+                </h4>
+                <div class="flex justify-end mb-2 no-print">
+                    <button class="btn btn-primary btn-sm" onclick="addRow('teamTable')">
+                        <i class="fa fa-plus mr-1"></i> 添加成员
+                    </button>
+                </div>
+                <table class="data-table" id="teamTable">
+                    <thead>
+                        <tr>
+                            <th style="width: 25%;">成员姓名</th>
+                            <th style="width: 55%;">承担具体任务</th>
+                            <th style="width: 20%;" class="no-print">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><input type="text" class="form-input" placeholder="成员姓名"></td>
+                            <td><input type="text" class="form-input" placeholder="如：实验操作、数据记录、图象绘制"></td>
+                            <td class="no-print"><button class="btn btn-danger btn-sm" onclick="deleteRow(this)">删除</button></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- 项目简介 -->
+        <section class="step-card bg-white rounded-lg shadow-md mb-6">
+            <div class="section-header flex items-center">
+                <i class="fa fa-bullseye mr-2"></i> 项目简介
+            </div>
+            <div class="p-5">
+                <div class="proj-intro-grid">
+                    <div class="intro-item">
+                        <h4><i class="fa fa-flag-checkered text-primary mr-1" style="font-size:0.9rem;"></i> 项目背景</h4>
+                        <p>函数是描述现实世界变化规律的重要数学模型。无论是运动时心率随时间的变化，还是音乐旋律中音符音高的起伏，都蕴含着丰富的函数关系。本项目以“健康运动”和“音乐创作”为两大主题，引导同学们从跨学科视角发现身边的函数，经历“提出问题—实验探究—数学建模—应用创造”的完整研究过程。</p>
+                    </div>
+                    <div class="intro-item">
+                        <h4><i class="fa fa-tasks text-primary mr-1" style="font-size:0.9rem;"></i> 项目目标</h4>
+                        <ul>
+                            <li>理解函数概念，掌握函数图象的画法与基本性质；</li>
+                            <li>能运用一次函数等模型刻画实际问题中的变量关系；</li>
+                            <li>经历跨学科探究，体会数学与体育、音乐等领域的联系；</li>
+                            <li>提升数据收集、分析、建模及团队协作能力。</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="mt-3 intro-item" style="background:#F8FAFC; border-radius:8px; padding:12px 18px; border:1px solid #E5E7EB;">
+                    <h4 style="font-weight:600; color:#374151; font-size:0.95rem; margin-bottom:2px;"><i class="fa fa-puzzle-piece text-primary mr-1" style="font-size:0.9rem;"></i> 涉及知识</h4>
+                    <div class="knowledge-tags">
+                        <span>函数概念</span>
+                        <span>函数图象</span>
+                        <span>一次函数</span>
+                        <span>变量关系</span>
+                        <span>心率/运动生理</span>
+                        <span>音高/频率</span>
+                        <span>乐谱分析</span>
+                        <span>数据采集与处理</span>
+                        <span>数学建模</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 任务一：体育中的函数 -->
+        <section class="step-card bg-white rounded-lg shadow-md mb-6">
+            <div class="section-header flex items-center justify-between">
+                <span><i class="fa fa-heartbeat mr-2"></i> 任务一：体育中的函数</span>
+                <button class="text-white/80 hover:text-white no-print" onclick="toggleCollapse('task1')">
+                    <i class="fa fa-chevron-down" id="task1-icon"></i>
+                </button>
+            </div>
+            <div class="collapse-content open" id="task1">
+            <div class="p-5 space-y-7">
+
+                <!-- 步骤1：研究项目与实验方案 可增删 -->
+                <div>
+                    <div class="flex items-center mb-3">
+                        <div class="step-number">1</div>
+                        <h4 class="font-semibold text-lg text-gray-800">设计研究项目与实验方案</h4>
+                    </div>
+                    <div class="tip-box">
+                        <i class="fa fa-lightbulb-o mr-1"></i> 
+                        可添加多组研究项目，每组独立设定研究问题、变量与实验方案。例如分别研究慢跑、跳绳两种运动的心率规律。
+                    </div>
+                    <div class="flex justify-end mb-2 no-print">
+                        <button class="btn btn-primary btn-sm" onclick="addRow('researchTable')">
+                            <i class="fa fa-plus mr-1"></i> 添加研究项目
+                        </button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="data-table" id="researchTable">
+                            <thead>
+                                <tr>
+                                    <th>研究问题</th>
+                                    <th>自变量</th>
+                                    <th>因变量</th>
+                                    <th>测试对象</th>
+                                    <th>运动项目</th>
+                                    <th>测量工具</th>
+                                    <th class="no-print">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><input type="text" class="form-input" placeholder="例：慢跑时运动时间与心率的关系"></td>
+                                    <td><input type="text" class="form-input" placeholder="例：运动时间（分钟）"></td>
+                                    <td><input type="text" class="form-input" placeholder="例：心率（次/分）"></td>
+                                    <td><input type="text" class="form-input" placeholder="例：本组3名同学"></td>
+                                    <td><input type="text" class="form-input" placeholder="例：慢跑"></td>
+                                    <td><input type="text" class="form-input" placeholder="例：运动手表"></td>
+                                    <td class="no-print"><button class="btn btn-danger btn-sm" onclick="deleteRow(this)">删除</button></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 步骤2：记录实验数据 -->
+                <div>
+                    <div class="flex items-center mb-3">
+                        <div class="step-number">2</div>
+                        <h4 class="font-semibold text-lg text-gray-800">记录实验数据</h4>
+                    </div>
+                    <div class="flex justify-end mb-2 no-print">
+                        <button class="btn btn-primary btn-sm" onclick="addRow('sportDataTable')">
+                            <i class="fa fa-plus mr-1"></i> 添加测量点
+                        </button>
+                        <button class="btn btn-outline btn-sm ml-2" onclick="drawSportFromTable()">
+                            <i class="fa fa-line-chart mr-1"></i> 生成图象
+                        </button>
+                    </div>
+                    <table class="data-table" id="sportDataTable">
+                        <thead>
+                            <tr>
+                                <th>序号</th>
+                                <th>x <input type="text" id="sportDataXTitle" value="运动时间（分钟）" placeholder="x轴标题（点击可编辑）" title="点击可编辑x轴标题" style="width: calc(100% - 18px); border: 1px dashed #4F46E5; background: #EEF2FF; border-radius: 4px; font-weight: 600; color: #4F46E5; text-align: center; font-size: 14px; outline: none; padding: 4px 6px; transition: all 0.2s;" onfocus="this.style.borderStyle='solid';this.style.background='#E0E7FF';this.style.boxShadow='0 0 0 3px rgba(79,70,229,0.15)';" onblur="this.style.borderStyle='dashed';this.style.background='#EEF2FF';this.style.boxShadow='none';"></th>
+                                <th>y <input type="text" id="sportDataYTitle" value="心率（次/分钟）" placeholder="y轴标题（点击可编辑）" title="点击可编辑y轴标题" style="width: calc(100% - 18px); border: 1px dashed #4F46E5; background: #EEF2FF; border-radius: 4px; font-weight: 600; color: #4F46E5; text-align: center; font-size: 14px; outline: none; padding: 4px 6px; transition: all 0.2s;" onfocus="this.style.borderStyle='solid';this.style.background='#E0E7FF';this.style.boxShadow='0 0 0 3px rgba(79,70,229,0.15)';" onblur="this.style.borderStyle='dashed';this.style.background='#EEF2FF';this.style.boxShadow='none';"></th>
+                                <th class="no-print">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>1</td>
+                                <td><input type="number" class="form-input sport-x" placeholder="请输入"></td>
+                                <td><input type="number" class="form-input sport-y" placeholder="请输入"></td>
+                                <td class="no-print"><button class="btn btn-danger btn-sm" onclick="deleteRow(this)">删除</button></td>
+                            </tr>
+                            <tr>
+                                <td>2</td>
+                                <td><input type="number" class="form-input sport-x" placeholder="请输入"></td>
+                                <td><input type="number" class="form-input sport-y" placeholder="请输入"></td>
+                                <td class="no-print"><button class="btn btn-danger btn-sm" onclick="deleteRow(this)">删除</button></td>
+                            </tr>
+                            <tr>
+                                <td>3</td>
+                                <td><input type="number" class="form-input sport-x" placeholder="请输入"></td>
+                                <td><input type="number" class="form-input sport-y" placeholder="请输入"></td>
+                                <td class="no-print"><button class="btn btn-danger btn-sm" onclick="deleteRow(this)">删除</button></td>
+                            </tr>
+                            <tr>
+                                <td>4</td>
+                                <td><input type="number" class="form-input sport-x" placeholder="请输入"></td>
+                                <td><input type="number" class="form-input sport-y" placeholder="请输入"></td>
+                                <td class="no-print"><button class="btn btn-danger btn-sm" onclick="deleteRow(this)">删除</button></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- 步骤3：交互式函数图象绘制 -->
+                <div>
+                    <div class="flex items-center mb-3">
+                        <div class="step-number">3</div>
+                        <h4 class="font-semibold text-lg text-gray-800">交互式函数图象绘制</h4>
+                    </div>
+                    <div class="tip-box">
+                        <i class="fa fa-mouse-pointer mr-1"></i>
+                        操作说明：点击画布可手动描点；可从表格一键生成图象；可自定义坐标轴标题和单位长度，刻度数值会自动同步更新；选择拟合类型后点击「函数拟合」自动计算解析式。
+                    </div>
+                    
+                    <canvas id="sportCanvas" class="graph-canvas"></canvas>
+                    
+                    <div class="tool-panel no-print">
+                        <div class="config-group w-full border-b pb-2 mb-1">
+                            <span>坐标轴设置：</span>
+                            <label>X轴标题 <input type="text" id="sportXLabel" value="时间(分钟)"></label>
+                            <label>Y轴标题 <input type="text" id="sportYLabel" value="心率(次/分)"></label>
+                            <label>X单位长度(px) <input type="number" id="sportXScale" value="25"></label>
+                            <label>Y单位长度(px) <input type="number" id="sportYScale" value="1.8"></label>
+                            <button class="btn btn-primary btn-sm" onclick="applySportConfig()">应用</button>
+                        </div>
+                        <button class="btn btn-outline" onclick="clearSportCanvas()">
+                            <i class="fa fa-eraser mr-1"></i> 清空
+                        </button>
+                        <button class="btn btn-outline" onclick="undoSportPoint()">
+                            <i class="fa fa-undo mr-1"></i> 撤销
+                        </button>
+                        <button class="btn btn-primary" onclick="drawSportLine()">
+                            <i class="fa fa-line-chart mr-1"></i> 连线
+                        </button>
+                        <select id="sportFitType" class="fit-select">
+                            <option value="linear">一次函数拟合</option>
+                            <option value="quadratic">二次函数拟合</option>
+                            <option value="exponential">指数函数拟合</option>
+                            <option value="logarithmic">对数函数拟合</option>
+                            <option value="power">幂函数拟合</option>
+                            <option value="sin">正弦函数拟合</option>
+                        </select>
+                        <button class="btn btn-primary" style="background:linear-gradient(90deg,#8B5CF6,#EC4899);" onclick="doSportFit()">
+                            <i class="fa fa-calculator mr-1"></i> 函数拟合
+                        </button>
+                        <div class="fit-result" id="sportFitResult">y = kx + b</div>
+                    </div>
+                </div>
+
+                <!-- 步骤4：数据分析与结论 -->
+                <div>
+                    <div class="flex items-center mb-3">
+                        <div class="step-number">4</div>
+                        <h4 class="font-semibold text-lg text-gray-800">数据分析与结论</h4>
+                    </div>
+                    <div class="grid md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-600 mb-1">函数类型判断</label>
+                            <input type="text" class="form-input" id="sportFuncType" placeholder="如：近似一次函数关系">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-600 mb-1">近似函数关系式</label>
+                            <input type="text" class="form-input" id="sportFormula" placeholder="如：y = 9.5x + 78">
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <label class="block text-sm font-medium text-gray-600 mb-1">数据变化规律与研究结论</label>
+                        <textarea class="form-input h-24 resize-none" id="sportConclusion"
+                            placeholder="描述心率随运动时间的变化趋势，回答最初提出的研究问题"></textarea>
+                    </div>
+                </div>
+
+                <!-- 步骤5：健康运动方案 -->
+                <div>
+                    <div class="flex items-center mb-3">
+                        <div class="step-number">5</div>
+                        <h4 class="font-semibold text-lg text-gray-800">设计健康运动方案</h4>
+                    </div>
+                    <textarea class="form-input h-32 resize-none" id="sportPlan"
+                        placeholder="结合实验结论，设计一套科学的健康运动方案，包括推荐运动类型、时长、心率安全区间、注意事项等"></textarea>
+                    
+                    <div class="mt-3">
+                        <label class="block text-sm font-medium text-gray-600 mb-1">上传运动方案文档/手绘作品</label>
+                        <div class="upload-box" onclick="document.getElementById('sportUpload').click()">
+                            <i class="fa fa-cloud-upload text-2xl mb-2"></i>
+                            <p>点击上传图片或文件</p>
+                            <input type="file" id="sportUpload" accept="image/*,.pdf,.doc,.docx" onchange="previewFile(this, 'sportPreview')">
+                        </div>
+                        <div id="sportPreview"></div>
+                    </div>
+                </div>
+
+            </div>
+            </div>
+        </section>
+
+        <!-- 任务二：音乐中的函数 -->
+        <section class="step-card bg-white rounded-lg shadow-md mb-6">
+            <div class="section-header flex items-center justify-between" style="background: linear-gradient(90deg, #8B5CF6 0%, #EC4899 100%);">
+                <span><i class="fa fa-music mr-2"></i> 任务二：音乐中的函数</span>
+                <button class="text-white/80 hover:text-white no-print" onclick="toggleCollapse('task2')">
+                    <i class="fa fa-chevron-down" id="task2-icon"></i>
+                </button>
+            </div>
+            <div class="collapse-content open" id="task2">
+            <div class="p-5 space-y-7">
+
+                <!-- 步骤1：探索乐谱中的函数规律 可增删 -->
+                <div>
+                    <div class="flex items-center mb-3">
+                        <div class="step-number" style="background: linear-gradient(135deg, #8B5CF6, #EC4899);">1</div>
+                        <h4 class="font-semibold text-lg text-gray-800">探索乐谱中的函数规律</h4>
+                    </div>
+                    <div class="flex justify-end mb-2 no-print">
+                        <button class="btn btn-primary btn-sm" onclick="addRow('musicResearchTable')">
+                            <i class="fa fa-plus mr-1"></i> 添加分析乐曲
+                        </button>
+                    </div>
+                    <table class="data-table" id="musicResearchTable">
+                        <thead>
+                            <tr>
+                                <th>乐曲名称</th>
+                                <th>横轴（自变量）</th>
+                                <th>纵轴（因变量）</th>
+                                <th>观察到的函数特征</th>
+                                <th class="no-print">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><input type="text" class="form-input" placeholder="请输入乐曲名称"></td>
+                                <td><input type="text" class="form-input" placeholder="请输入横轴（自变量）"></td>
+                                <td><input type="text" class="form-input" placeholder="请输入纵轴（因变量）"></td>
+                                <td><input type="text" class="form-input" placeholder="请输入观察到的函数特征"></td>
+                                <td class="no-print"><button class="btn btn-danger btn-sm" onclick="deleteRow(this)">删除</button></td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div class="mt-4">
+                        <label class="block text-sm font-medium text-gray-600 mb-2">
+                            <i class="fa fa-wrench text-accent mr-1"></i> 交互式工具：音符-音高转换
+                        </label>
+                        <div class="bg-purple-50 p-4 rounded-lg">
+                            <div class="flex items-center gap-3 flex-wrap">
+                                <span class="text-sm text-gray-600">选择音符：</span>
+                                <select id="noteSelect" class="form-input w-32" onchange="convertNote()">
+                                    <option value="60">C4 (中央C)</option>
+                                    <option value="62">D4</option>
+                                    <option value="64">E4</option>
+                                    <option value="65">F4</option>
+                                    <option value="67">G4</option>
+                                    <option value="69">A4</option>
+                                    <option value="71">B4</option>
+                                    <option value="72">C5</option>
+                                </select>
+                                <span class="text-sm text-gray-600">对应音高数值：</span>
+                                <span id="noteValue" class="font-bold text-accent">60</span>
+                                <button class="btn btn-outline btn-sm ml-auto" onclick="addMusicDataPoint()">
+                                    添加到数据
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 音乐数据表格 -->
+                    <div class="mt-4">
+                        <div class="flex justify-end mb-2 no-print">
+                            <button class="btn btn-primary btn-sm" onclick="addRow('musicDataTable')">
+                                <i class="fa fa-plus mr-1"></i> 添加坐标点
+                            </button>
+                            <button class="btn btn-outline btn-sm ml-2" onclick="drawMusicFromTable()">
+                                <i class="fa fa-line-chart mr-1"></i> 生成图象
+                            </button>
+                        </div>
+                        <table class="data-table" id="musicDataTable">
+                            <thead>
+                                <tr>
+                                    <th>序号</th>
+                                    <th>x 演奏时间（拍）</th>
+                                    <th>y 音高数值</th>
+                                    <th class="no-print">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>1</td>
+                                    <td><input type="number" class="form-input music-x" placeholder="请输入"></td>
+                                    <td><input type="number" class="form-input music-y" placeholder="请输入"></td>
+                                    <td class="no-print"><button class="btn btn-danger btn-sm" onclick="deleteRow(this)">删除</button></td>
+                                </tr>
+                                <tr>
+                                    <td>2</td>
+                                    <td><input type="number" class="form-input music-x" placeholder="请输入"></td>
+                                    <td><input type="number" class="form-input music-y" placeholder="请输入"></td>
+                                    <td class="no-print"><button class="btn btn-danger btn-sm" onclick="deleteRow(this)">删除</button></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 步骤2：音乐函数图象绘制 -->
+                <div>
+                    <div class="flex items-center mb-3">
+                        <div class="step-number" style="background: linear-gradient(135deg, #8B5CF6, #EC4899);">2</div>
+                        <h4 class="font-semibold text-lg text-gray-800">乐谱函数图象绘制</h4>
+                    </div>
+                    <canvas id="musicCanvas" class="graph-canvas"></canvas>
+                    
+                    <div class="tool-panel no-print">
+                        <div class="config-group w-full border-b pb-2 mb-1">
+                            <span>坐标轴设置：</span>
+                            <label>X轴标题 <input type="text" id="musicXLabel" value="演奏时间(拍)"></label>
+                            <label>Y轴标题 <input type="text" id="musicYLabel" value="音高"></label>
+                            <label>X单位长度(px) <input type="number" id="musicXScale" value="40"></label>
+                            <label>Y单位长度(px) <input type="number" id="musicYScale" value="2"></label>
+                            <button class="btn btn-primary btn-sm" style="background:linear-gradient(90deg,#8B5CF6,#EC4899);" onclick="applyMusicConfig()">应用</button>
+                        </div>
+                        <button class="btn btn-outline" onclick="clearMusicCanvas()">
+                            <i class="fa fa-eraser mr-1"></i> 清空
+                        </button>
+                        <button class="btn btn-outline" onclick="undoMusicPoint()">
+                            <i class="fa fa-undo mr-1"></i> 撤销
+                        </button>
+                        <button class="btn btn-primary" style="background:linear-gradient(90deg,#8B5CF6,#EC4899);" onclick="drawMusicLine()">
+                            <i class="fa fa-line-chart mr-1"></i> 连线
+                        </button>
+                        <select id="musicFitType" class="fit-select">
+                            <option value="linear">一次函数拟合</option>
+                            <option value="quadratic">二次函数拟合</option>
+                            <option value="exponential">指数函数拟合</option>
+                            <option value="logarithmic">对数函数拟合</option>
+                            <option value="power">幂函数拟合</option>
+                            <option value="sin">正弦函数拟合</option>
+                        </select>
+                        <button class="btn btn-primary" style="background:linear-gradient(90deg,#8B5CF6,#EC4899);" onclick="doMusicFit()">
+                            <i class="fa fa-calculator mr-1"></i> 函数拟合
+                        </button>
+                        <div class="fit-result" id="musicFitResult" style="color:#8B5CF6;">y = f(x)</div>
+                    </div>
+                </div>
+
+                <!-- 步骤3：创作旋律 -->
+                <div>
+                    <div class="flex items-center mb-3">
+                        <div class="step-number" style="background: linear-gradient(135deg, #8B5CF6, #EC4899);">3</div>
+                        <h4 class="font-semibold text-lg text-gray-800">利用函数创作旋律</h4>
+                    </div>
+                    <div class="tip-box" style="background:#FAF5FF; border-color:#A855F7; color:#6B21A8;">
+                        <i class="fa fa-lightbulb-o mr-1"></i>
+                        创作思路参考：用斐波那契数列对应音符、用周期性设计重复乐句、用单调性设计音阶上行/下行、用对称性设计呼应乐句。
+                    </div>
+                    <div class="grid md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-600 mb-1">我的创作思路</label>
+                            <textarea class="form-input h-24 resize-none" id="createIdea"
+                                placeholder="描述你用到了哪些函数知识来创作旋律"></textarea>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-600 mb-1">用到的函数知识</label>
+                            <textarea class="form-input h-24 resize-none" id="funcKnowledge"
+                                placeholder="如：周期性、单调性、对称性、斐波那契数列规律等"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="mt-3">
+                        <label class="block text-sm font-medium text-gray-600 mb-1">上传原创乐谱 & 函数图象</label>
+                        <div class="upload-box" onclick="document.getElementById('musicUpload').click()">
+                            <i class="fa fa-file-image-o text-2xl mb-2"></i>
+                            <p>点击上传手绘乐谱、函数图象照片</p>
+                            <input type="file" id="musicUpload" accept="image/*" onchange="previewFile(this, 'musicPreview')">
+                        </div>
+                        <div id="musicPreview"></div>
+                    </div>
+                </div>
+
+                <!-- 步骤4：演奏展示 -->
+                <div>
+                    <div class="flex items-center mb-3">
+                        <div class="step-number" style="background: linear-gradient(135deg, #8B5CF6, #EC4899);">4</div>
+                        <h4 class="font-semibold text-lg text-gray-800">演奏展示</h4>
+                    </div>
+                    <div class="grid grid-cols-3 gap-3 mb-4">
+                        <div class="play-option">
+                            <i class="fa fa-music"></i>
+                            <p>乐器演奏</p>
+                            <span>钢琴/口琴/笛子</span>
+                        </div>
+                        <div class="play-option">
+                            <i class="fa fa-laptop"></i>
+                            <p>软件生成</p>
+                            <span>音乐软件播放</span>
+                        </div>
+                        <div class="play-option">
+                            <i class="fa fa-glass"></i>
+                            <p>自制乐器</p>
+                            <span>水杯/吸管制作</span>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-600 mb-1">上传演奏视频/音频</label>
+                        <div class="upload-box" onclick="document.getElementById('playUpload').click()">
+                            <i class="fa fa-video-camera text-2xl mb-2"></i>
+                            <p>点击上传演奏视频或音频文件</p>
+                            <input type="file" id="playUpload" accept="video/*,audio/*" onchange="previewFile(this, 'playPreview')">
+                        </div>
+                        <div id="playPreview"></div>
+                    </div>
+                </div>
+
+            </div>
+            </div>
+        </section>
+
+        <!-- 三、自我评价 -->
+        <section class="step-card bg-white rounded-lg shadow-md mb-6">
+            <div class="section-header flex items-center">
+                <i class="fa fa-star mr-2"></i> 三、自我评价
+            </div>
+            <div class="p-5">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 20%;">评价维度</th>
+                            <th style="width: 16%;">优秀(A)</th>
+                            <th style="width: 16%;">良好(B)</th>
+                            <th style="width: 16%;">合格(C)</th>
+                            <th style="width: 16%;">不合格(D)</th>
+                            <th style="width: 16%;">自我评分</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="text-left font-medium">函数知识运用</td>
+                            <td class="text-xs text-left">能准确理解函数概念，独立分析并正确判断变量间的函数关系，函数类型识别与关系式推导完全正确</td>
+                            <td class="text-xs text-left">基本掌握函数概念，能判断主要函数关系，偶有偏差但可通过提示修正</td>
+                            <td class="text-xs text-left">对函数概念理解模糊，函数关系分析存在多处错误，需较多指导才能完成</td>
+                            <td class="text-xs text-left">无法理解函数概念，不能识别变量间的函数关系，关系式推导完全错误</td>
+                            <td class="radio-score">
+                                <label><input type="radio" name="s1" value="A" onchange="calcScore()"> A</label>
+                                <label><input type="radio" name="s1" value="B" onchange="calcScore()"> B</label>
+                                <label><input type="radio" name="s1" value="C" onchange="calcScore()"> C</label>
+                                <label><input type="radio" name="s1" value="D" onchange="calcScore()"> D</label>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="text-left font-medium">实验探究过程</td>
+                            <td class="text-xs text-left">实验设计科学严谨，变量控制合理，数据采集完整规范，能独立完成探究全过程</td>
+                            <td class="text-xs text-left">实验流程完整，数据基本齐全，变量控制存在少量疏漏但整体有效</td>
+                            <td class="text-xs text-left">实验过程不完整，数据缺失较多或记录不规范，需在他人协助下完成</td>
+                            <td class="text-xs text-left">未完成实验探究，无有效数据或数据完全无法使用</td>
+                            <td class="radio-score">
+                                <label><input type="radio" name="s2" value="A" onchange="calcScore()"> A</label>
+                                <label><input type="radio" name="s2" value="B" onchange="calcScore()"> B</label>
+                                <label><input type="radio" name="s2" value="C" onchange="calcScore()"> C</label>
+                                <label><input type="radio" name="s2" value="D" onchange="calcScore()"> D</label>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="text-left font-medium">成果完成质量</td>
+                            <td class="text-xs text-left">成果完整且富有创意，方案科学合理，能深入应用函数知识解决实际问题</td>
+                            <td class="text-xs text-left">成果基本完整，符合任务要求，能运用函数知识但创新性不足</td>
+                            <td class="text-xs text-left">成果内容单薄，部分要求未达成，函数知识应用停留在表面</td>
+                            <td class="text-xs text-left">未完成成果，或成果严重不符合任务要求，无法体现函数知识应用</td>
+                            <td class="radio-score">
+                                <label><input type="radio" name="s3" value="A" onchange="calcScore()"> A</label>
+                                <label><input type="radio" name="s3" value="B" onchange="calcScore()"> B</label>
+                                <label><input type="radio" name="s3" value="C" onchange="calcScore()"> C</label>
+                                <label><input type="radio" name="s3" value="D" onchange="calcScore()"> D</label>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="text-left font-medium">跨学科融合</td>
+                            <td class="text-xs text-left">深入挖掘体育/音乐学科知识，与数学函数自然融合，体现学科本质联系</td>
+                            <td class="text-xs text-left">能结合体育/音乐的基础知识，与函数内容结合较为自然</td>
+                            <td class="text-xs text-left">跨学科内容生硬，仅停留在表面联系，缺乏深度整合</td>
+                            <td class="text-xs text-left">完全未能体现跨学科联系，仅从单一数学角度完成任务</td>
+                            <td class="radio-score">
+                                <label><input type="radio" name="s4" value="A" onchange="calcScore()"> A</label>
+                                <label><input type="radio" name="s4" value="B" onchange="calcScore()"> B</label>
+                                <label><input type="radio" name="s4" value="C" onchange="calcScore()"> C</label>
+                                <label><input type="radio" name="s4" value="D" onchange="calcScore()"> D</label>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="text-left font-medium">小组协作分工</td>
+                            <td class="text-xs text-left">分工明确合理，全员深度参与，成员间有效沟通协作，贡献均衡</td>
+                            <td class="text-xs text-left">有明确分工，成员基本配合，个别成员参与度略有不足</td>
+                            <td class="text-xs text-left">分工模糊，部分成员参与度低，协作过程中存在明显问题</td>
+                            <td class="text-xs text-left">基本无协作，由个别成员独立完成，多数成员未参与</td>
+                            <td class="radio-score">
+                                <label><input type="radio" name="s5" value="A" onchange="calcScore()"> A</label>
+                                <label><input type="radio" name="s5" value="B" onchange="calcScore()"> B</label>
+                                <label><input type="radio" name="s5" value="C" onchange="calcScore()"> C</label>
+                                <label><input type="radio" name="s5" value="D" onchange="calcScore()"> D</label>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- 四、总结与反思 -->
+        <section class="step-card bg-white rounded-lg shadow-md mb-6">
+            <div class="section-header flex items-center">
+                <i class="fa fa-book mr-2"></i> 四、总结与反思
+            </div>
+            <div class="p-5 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-600 mb-1">本次项目的收获</label>
+                    <textarea class="form-input h-28 resize-none" id="harvest"
+                        placeholder="从知识、能力、协作等方面谈谈你的收获"></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-600 mb-1">遇到的困难及改进思路</label>
+                    <textarea class="form-input h-28 resize-none" id="improve"
+                        placeholder="记录遇到的问题，以及下次可以如何改进"></textarea>
+                </div>
+            </div>
+        </section>
+
+        <footer class="text-center text-gray-400 text-sm py-4">
+            寻找身边的函数 · 项目学习任务单
+        </footer>
+    </div>
+
+    <script>
+        // ========== 自定义日历逻辑 ==========
+        let selectedDate = null;
+        let currentViewDate = new Date();
+        const dateDisplayText = document.getElementById('dateDisplayText');
+        const calendarPopup = document.getElementById('calendarPopup');
+        const daysGrid = document.getElementById('daysGrid');
+        const calMonthYear = document.getElementById('calMonthYear');
+
+        function toggleCalendar() {
+            const isOpen = calendarPopup.classList.contains('open');
+            if (isOpen) {
+                calendarPopup.classList.remove('open');
+            } else {
+                renderCalendar();
+                calendarPopup.classList.add('open');
+            }
+        }
+
+        document.addEventListener('click', function(e) {
+            const wrapper = document.getElementById('datePickerWrapper');
+            if (!wrapper.contains(e.target)) {
+                calendarPopup.classList.remove('open');
+            }
+        });
+
+        function renderCalendar() {
+            const year = currentViewDate.getFullYear();
+            const month = currentViewDate.getMonth();
+            calMonthYear.textContent = `${year}年 ${month+1}月`;
+
+            const firstDay = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const daysInPrevMonth = new Date(year, month, 0).getDate();
+
+            let html = '';
+            for (let i = firstDay - 1; i >= 0; i--) {
+                const d = daysInPrevMonth - i;
+                html += `<button class="day-cell other-month" data-year="${year}" data-month="${month-1}" data-day="${d}">${d}</button>`;
+            }
+            const today = new Date();
+            for (let d = 1; d <= daysInMonth; d++) {
+                const isToday = (d === today.getDate() && month === today.getMonth() && year === today.getFullYear());
+                const isSelected = (selectedDate && d === selectedDate.getDate() && month === selectedDate.getMonth() && year === selectedDate.getFullYear());
+                let cls = 'day-cell';
+                if (isToday) cls += ' today';
+                if (isSelected) cls += ' selected';
+                html += `<button class="${cls}" data-year="${year}" data-month="${month}" data-day="${d}">${d}</button>`;
+            }
+            const totalCells = firstDay + daysInMonth;
+            const remain = (7 - totalCells % 7) % 7;
+            for (let d = 1; d <= remain; d++) {
+                html += `<button class="day-cell other-month" data-year="${year}" data-month="${month+1}" data-day="${d}">${d}</button>`;
+            }
+            daysGrid.innerHTML = html;
+
+            daysGrid.querySelectorAll('.day-cell').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const y = parseInt(this.dataset.year);
+                    const m = parseInt(this.dataset.month);
+                    const d = parseInt(this.dataset.day);
+                    const date = new Date(y, m, d);
+                    if (m !== currentViewDate.getMonth() || y !== currentViewDate.getFullYear()) {
+                        currentViewDate = new Date(y, m, 1);
+                        renderCalendar();
+                    }
+                    selectDate(date);
+                });
+            });
+        }
+
+        function selectDate(date) {
+            selectedDate = new Date(date);
+            const y = selectedDate.getFullYear();
+            const m = String(selectedDate.getMonth() + 1).padStart(2, '0');
+            const d = String(selectedDate.getDate()).padStart(2, '0');
+            dateDisplayText.textContent = `${y} / ${m} / ${d}`;
+            dateDisplayText.classList.remove('placeholder');
+            calendarPopup.classList.remove('open');
+            renderCalendar();
+        }
+
+        function changeMonth(delta) {
+            currentViewDate.setMonth(currentViewDate.getMonth() + delta);
+            renderCalendar();
+        }
+
+        function selectToday() {
+            const today = new Date();
+            currentViewDate = new Date(today.getFullYear(), today.getMonth(), 1);
+            renderCalendar();
+            selectDate(today);
+        }
+
+        function clearDate() {
+            selectedDate = null;
+            dateDisplayText.textContent = '年 / 月 / 日';
+            dateDisplayText.classList.add('placeholder');
+            calendarPopup.classList.remove('open');
+            renderCalendar();
+        }
+
+        renderCalendar();
+
+        // ========== 全局配置变量 ==========
+        const sportCanvas = document.getElementById('sportCanvas');
+        const sportCtx = sportCanvas.getContext('2d');
+        let sportPoints = [];
+        let sportConfig = {
+            xScale: 25,
+            yScale: 1.8,
+            yBase: 60,
+            originX: 60,
+            originY: 380,
+            xLabel: '时间(分钟)',
+            yLabel: '心率(次/分)'
+        };
+
+        const musicCanvas = document.getElementById('musicCanvas');
+        const musicCtx = musicCanvas.getContext('2d');
+        let musicPoints = [];
+        let musicConfig = {
+            xScale: 40,
+            yScale: 2,
+            yBase: 50,
+            originX: 60,
+            originY: 380,
+            xLabel: '演奏时间(拍)',
+            yLabel: '音高'
+        };
+
+        // ========== 初始化 ==========
+        window.onload = function() {
+            setupHiDPICanvas(sportCanvas, sportCtx);
+            setupHiDPICanvas(musicCanvas, musicCtx);
+            
+            initGrid(sportCtx, sportCanvas, sportConfig);
+            initGrid(musicCtx, musicCanvas, musicConfig);
+            
+            sportCanvas.addEventListener('click', handleSportCanvasClick);
+            musicCanvas.addEventListener('click', handleMusicCanvasClick);
+            
+            window.addEventListener('resize', () => {
+                redrawAll();
+            });
+            
+            loadData();
+        };
+
+        function setupHiDPICanvas(canvas, ctx) {
+            const dpr = window.devicePixelRatio || 1;
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            ctx.scale(dpr, dpr);
+            canvas.style.width = rect.width + 'px';
+            canvas.style.height = rect.height + 'px';
+        }
+
+        function redrawAll() {
+            setupHiDPICanvas(sportCanvas, sportCtx);
+            setupHiDPICanvas(musicCanvas, musicCtx);
+            initGrid(sportCtx, sportCanvas, sportConfig);
+            initGrid(musicCtx, musicCanvas, musicConfig);
+            redrawSport();
+            redrawMusic();
+        }
+
+        function initGrid(ctx, canvas, config) {
+            const w = canvas.getBoundingClientRect().width;
+            const h = canvas.getBoundingClientRect().height;
+            const ox = config.originX;
+            const oy = config.originY;
+
+            ctx.clearRect(0, 0, w, h);
+
+            // 背景细网格（每20px）
+            ctx.strokeStyle = '#E5E7EB';
+            ctx.lineWidth = 0.5;
+            for(let i=0; i<=w; i+=20) {
+                ctx.beginPath();
+                ctx.moveTo(i, 0);
+                ctx.lineTo(i, h);
+                ctx.stroke();
+            }
+            for(let i=0; i<=h; i+=20) {
+                ctx.beginPath();
+                ctx.moveTo(0, i);
+                ctx.lineTo(w, i);
+                ctx.stroke();
+            }
+
+            // 主网格线（每100px）
+            ctx.strokeStyle = '#9CA3AF';
+            ctx.lineWidth = 0.8;
+            for(let i=ox; i<=w; i+=100) {
+                ctx.beginPath();
+                ctx.moveTo(i, 0);
+                ctx.lineTo(i, h);
+                ctx.stroke();
+            }
+            for(let i=oy; i>=0; i-=100) {
+                ctx.beginPath();
+                ctx.moveTo(0, i);
+                ctx.lineTo(w, i);
+                ctx.stroke();
+            }
+
+            // 坐标轴
+            ctx.strokeStyle = '#1F2937';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(ox, oy);
+            ctx.lineTo(w-20, oy);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(ox, oy);
+            ctx.lineTo(ox, 20);
+            ctx.stroke();
+
+            // 箭头
+            ctx.fillStyle = '#1F2937';
+            ctx.beginPath();
+            ctx.moveTo(w-20, oy);
+            ctx.lineTo(w-30, oy-5);
+            ctx.lineTo(w-30, oy+5);
+            ctx.closePath();
+            ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(ox, 20);
+            ctx.lineTo(ox-5, 30);
+            ctx.lineTo(ox+5, 30);
+            ctx.closePath();
+            ctx.fill();
+
+            // 原点和标题
+            ctx.fillStyle = '#374151';
+            ctx.font = '13px system-ui, sans-serif';
+            ctx.fillText('O', ox-18, oy+15);
+            ctx.fillText(config.xLabel, w-90, oy+20);
+            ctx.fillText(config.yLabel, 10, 35);
+
+            // 智能刻度：根据单位长度动态计算刻度间隔
+            ctx.font = '11px system-ui, sans-serif';
+            ctx.fillStyle = '#6B7280';
+            ctx.strokeStyle = '#6B7280';
+            ctx.lineWidth = 1;
+
+            // X轴刻度：刻度值 = 刻度序号 × xStepValue，像素位置 = ox + 刻度值 × xScale
+            const xAvailPx = w - ox - 40;
+            const xMaxValue = xAvailPx / config.xScale;
+            const xStepValue = niceTickStep(xMaxValue, 8); // 至少8个刻度区间
+            const xStepCount = Math.floor(xMaxValue / xStepValue);
+            for(let i=1; i<=xStepCount; i++) {
+                const v = i * xStepValue;
+                const x = ox + v * config.xScale;
+                if(x > w - 30) break;
+                ctx.beginPath();
+                ctx.moveTo(x, oy);
+                ctx.lineTo(x, oy + 5);
+                ctx.stroke();
+                const label = formatTickValue(v);
+                const labelWidth = ctx.measureText(label).width;
+                ctx.fillText(label, x - labelWidth/2, oy + 18);
+            }
+
+            // Y轴刻度：实际值 = yBase + 刻度序号 × yStepValue
+            const yAvailPx = oy - 30;
+            const yMaxDelta = yAvailPx / config.yScale;
+            const yStepValue = niceTickStep(yMaxDelta, 8);
+            const yStepCount = Math.floor(yMaxDelta / yStepValue);
+            for(let i=1; i<=yStepCount; i++) {
+                const delta = i * yStepValue;
+                const y = oy - delta * config.yScale;
+                if(y < 30) break;
+                ctx.beginPath();
+                ctx.moveTo(ox - 5, y);
+                ctx.lineTo(ox, y);
+                ctx.stroke();
+                const actualValue = config.yBase + delta;
+                const label = formatTickValue(actualValue);
+                const labelWidth = ctx.measureText(label).width;
+                ctx.fillText(label, ox - 8 - labelWidth, y + 4);
+            }
+        }
+
+        // 生成"友好"的刻度步长（1, 2, 5, 10, 20, 50, 100...的倍数）
+        function niceTickStep(maxValue, minTickCount) {
+            if(maxValue <= 0) return 1;
+            // 目标步长：使刻度数不少于 minTickCount
+            const targetStep = maxValue / Math.max(minTickCount, 1);
+            const magnitude = Math.pow(10, Math.floor(Math.log10(targetStep)));
+            const normalized = targetStep / magnitude;
+            let nice;
+            if(normalized <= 1) nice = 1;
+            else if(normalized <= 2) nice = 2;
+            else if(normalized <= 5) nice = 5;
+            else nice = 10;
+            return nice * magnitude;
+        }
+
+        // 格式化刻度数值显示
+        function formatTickValue(v) {
+            if(Number.isInteger(v)) return v.toString();
+            const abs = Math.abs(v);
+            if(abs >= 1000) return v.toFixed(0);
+            if(abs >= 100) return v.toFixed(1).replace(/\.0$/, '');
+            if(abs >= 10) return v.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+            return v.toFixed(3).replace(/0+$/, '').replace(/\.$/, '');
+        }
+
+        function applySportConfig() {
+            sportConfig.xLabel = document.getElementById('sportXLabel').value;
+            sportConfig.yLabel = document.getElementById('sportYLabel').value;
+            const newXScale = parseFloat(document.getElementById('sportXScale').value);
+            const newYScale = parseFloat(document.getElementById('sportYScale').value);
+            if(isNaN(newXScale) || newXScale <= 0 || isNaN(newYScale) || newYScale <= 0) {
+                alert('单位长度必须为正数');
+                return;
+            }
+            sportConfig.xScale = newXScale;
+            sportConfig.yScale = newYScale;
+            refreshCanvasCoords(sportPoints, sportConfig);
+            initGrid(sportCtx, sportCanvas, sportConfig);
+            redrawSport();
+        }
+
+        function applyMusicConfig() {
+            musicConfig.xLabel = document.getElementById('musicXLabel').value;
+            musicConfig.yLabel = document.getElementById('musicYLabel').value;
+            const newXScale = parseFloat(document.getElementById('musicXScale').value);
+            const newYScale = parseFloat(document.getElementById('musicYScale').value);
+            if(isNaN(newXScale) || newXScale <= 0 || isNaN(newYScale) || newYScale <= 0) {
+                alert('单位长度必须为正数');
+                return;
+            }
+            musicConfig.xScale = newXScale;
+            musicConfig.yScale = newYScale;
+            refreshCanvasCoords(musicPoints, musicConfig);
+            initGrid(musicCtx, musicCanvas, musicConfig);
+            redrawMusic();
+        }
+
+        // 根据当前配置重新计算所有数据点的画布坐标（确保数据与图像精确对应）
+        function refreshCanvasCoords(points, config) {
+            points.forEach(p => {
+                p.canvasX = config.originX + p.realX * config.xScale;
+                p.canvasY = config.originY - (p.realY - config.yBase) * config.yScale;
+            });
+        }
+
+        function handleSportCanvasClick(e) {
+            const rect = sportCanvas.getBoundingClientRect();
+            const cx = e.clientX - rect.left;
+            const cy = e.clientY - rect.top;
+            const realX = (cx - sportConfig.originX) / sportConfig.xScale;
+            const realY = sportConfig.yBase + (sportConfig.originY - cy) / sportConfig.yScale;
+            if(realX < 0 || realY < 0) return;
+            sportPoints.push({realX, realY, canvasX: 0, canvasY: 0});
+            refreshCanvasCoords(sportPoints, sportConfig);
+            redrawSport();
+        }
+
+        function redrawSport() {
+            refreshCanvasCoords(sportPoints, sportConfig);
+            initGrid(sportCtx, sportCanvas, sportConfig);
+            sportPoints.forEach(p => {
+                sportCtx.beginPath();
+                sportCtx.arc(p.canvasX, p.canvasY, 4, 0, Math.PI*2);
+                sportCtx.fillStyle = '#4F46E5';
+                sportCtx.fill();
+                // 标注实际数据值，便于核对与坐标刻度一致
+                sportCtx.fillStyle = '#4F46E5';
+                sportCtx.font = '10px system-ui, sans-serif';
+                const label = `(${formatTickValue(p.realX)}, ${formatTickValue(p.realY)})`;
+                const lw = sportCtx.measureText(label).width;
+                sportCtx.fillText(label, p.canvasX - lw/2, p.canvasY - 8);
+            });
+        }
+
+        function handleMusicCanvasClick(e) {
+            const rect = musicCanvas.getBoundingClientRect();
+            const cx = e.clientX - rect.left;
+            const cy = e.clientY - rect.top;
+            const realX = (cx - musicConfig.originX) / musicConfig.xScale;
+            const realY = musicConfig.yBase + (musicConfig.originY - cy) / musicConfig.yScale;
+            if(realX < 0 || realY < 0) return;
+            musicPoints.push({realX, realY, canvasX: 0, canvasY: 0});
+            refreshCanvasCoords(musicPoints, musicConfig);
+            redrawMusic();
+        }
+
+        function redrawMusic() {
+            refreshCanvasCoords(musicPoints, musicConfig);
+            initGrid(musicCtx, musicCanvas, musicConfig);
+            musicPoints.forEach(p => {
+                musicCtx.beginPath();
+                musicCtx.arc(p.canvasX, p.canvasY, 4, 0, Math.PI*2);
+                musicCtx.fillStyle = '#8B5CF6';
+                musicCtx.fill();
+                // 标注实际数据值，便于核对与坐标刻度一致
+                musicCtx.fillStyle = '#8B5CF6';
+                musicCtx.font = '10px system-ui, sans-serif';
+                const label = `(${formatTickValue(p.realX)}, ${formatTickValue(p.realY)})`;
+                const lw = musicCtx.measureText(label).width;
+                musicCtx.fillText(label, p.canvasX - lw/2, p.canvasY - 8);
+            });
+        }
+
+        function drawSportFromTable() {
+            const xInputs = document.querySelectorAll('#sportDataTable .sport-x');
+            const yInputs = document.querySelectorAll('#sportDataTable .sport-y');
+            sportPoints = [];
+            xInputs.forEach((input, i) => {
+                const rx = parseFloat(input.value);
+                const ry = parseFloat(yInputs[i].value);
+                if(!isNaN(rx) && !isNaN(ry)) {
+                    sportPoints.push({realX: rx, realY: ry, canvasX: 0, canvasY: 0});
+                }
+            });
+            refreshCanvasCoords(sportPoints, sportConfig);
+            redrawSport();
+            drawSportLine();
+        }
+
+        function drawMusicFromTable() {
+            const xInputs = document.querySelectorAll('#musicDataTable .music-x');
+            const yInputs = document.querySelectorAll('#musicDataTable .music-y');
+            musicPoints = [];
+            xInputs.forEach((input, i) => {
+                const rx = parseFloat(input.value);
+                const ry = parseFloat(yInputs[i].value);
+                if(!isNaN(rx) && !isNaN(ry)) {
+                    musicPoints.push({realX: rx, realY: ry, canvasX: 0, canvasY: 0});
+                }
+            });
+            refreshCanvasCoords(musicPoints, musicConfig);
+            redrawMusic();
+            drawMusicLine();
+        }
+
+        // 按 X 轴坐标值升序排序点集（不修改原数组，返回新数组）
+        // 使用 realX - b.realX 数值比较，可正确处理正数、负数、零值及相同横坐标
+        function sortByX(points) {
+            return points.slice().sort((a, b) => a.realX - b.realX);
+        }
+
+        function drawSportLine() {
+            if(sportPoints.length < 2) { alert('至少需要2个点'); return; }
+            refreshCanvasCoords(sportPoints, sportConfig);
+            redrawSport();
+            const sorted = sortByX(sportPoints);
+            sportCtx.beginPath();
+            sportCtx.strokeStyle = '#06B6D4';
+            sportCtx.lineWidth = 2;
+            sorted.forEach((p, i) => {
+                if(i===0) sportCtx.moveTo(p.canvasX, p.canvasY);
+                else sportCtx.lineTo(p.canvasX, p.canvasY);
+            });
+            sportCtx.stroke();
+        }
+
+        function drawMusicLine() {
+            if(musicPoints.length < 2) { alert('至少需要2个点'); return; }
+            refreshCanvasCoords(musicPoints, musicConfig);
+            redrawMusic();
+            const sorted = sortByX(musicPoints);
+            musicCtx.beginPath();
+            musicCtx.strokeStyle = '#EC4899';
+            musicCtx.lineWidth = 2;
+            sorted.forEach((p, i) => {
+                if(i===0) musicCtx.moveTo(p.canvasX, p.canvasY);
+                else musicCtx.lineTo(p.canvasX, p.canvasY);
+            });
+            musicCtx.stroke();
+        }
+
+        function clearSportCanvas() {
+            sportPoints = [];
+            initGrid(sportCtx, sportCanvas, sportConfig);
+            document.getElementById('sportFitResult').textContent = 'y = kx + b';
+        }
+        function undoSportPoint() {
+            sportPoints.pop();
+            redrawSport();
+        }
+        function clearMusicCanvas() {
+            musicPoints = [];
+            initGrid(musicCtx, musicCanvas, musicConfig);
+            document.getElementById('musicFitResult').textContent = 'y = f(x)';
+        }
+        function undoMusicPoint() {
+            musicPoints.pop();
+            redrawMusic();
+        }
+
+        function fit(points, type) {
+            if(points.length < 2) return null;
+            const n = points.length;
+            const data = points.map(p => ({x: p.realX, y: p.realY}));
+            switch(type) {
+                case 'linear': {
+                    let sumX=0, sumY=0, sumXY=0, sumX2=0;
+                    data.forEach(d => {
+                        sumX += d.x; sumY += d.y;
+                        sumXY += d.x*d.y; sumX2 += d.x*d.x;
+                    });
+                    const k = (n*sumXY - sumX*sumY) / (n*sumX2 - sumX*sumX);
+                    const b = (sumY - k*sumX) / n;
+                    return { formula: `y = ${k.toFixed(2)}x + ${b.toFixed(2)}`, fn: x => k*x + b };
+                }
+                case 'quadratic': {
+                    let sumX=0, sumX2=0, sumX3=0, sumX4=0;
+                    let sumY=0, sumXY=0, sumX2Y=0;
+                    data.forEach(d => {
+                        const x2 = d.x*d.x, x3 = x2*d.x, x4 = x3*d.x;
+                        sumX += d.x; sumX2 += x2; sumX3 += x3; sumX4 += x4;
+                        sumY += d.y; sumXY += d.x*d.y; sumX2Y += x2*d.y;
+                    });
+                    const A = [[sumX4, sumX3, sumX2], [sumX3, sumX2, sumX], [sumX2, sumX, n]];
+                    const B = [sumX2Y, sumXY, sumY];
+                    const det = A[0][0]*(A[1][1]*A[2][2]-A[1][2]*A[2][1]) 
+                              - A[0][1]*(A[1][0]*A[2][2]-A[1][2]*A[2][0])
+                              + A[0][2]*(A[1][0]*A[2][1]-A[1][1]*A[2][0]);
+                    if(Math.abs(det) < 1e-10) return null;
+                    const a = (B[0]*(A[1][1]*A[2][2]-A[1][2]*A[2][1]) 
+                              - A[0][1]*(B[1]*A[2][2]-A[1][2]*B[2])
+                              + A[0][2]*(B[1]*A[2][1]-A[1][1]*B[2])) / det;
+                    const b = (A[0][0]*(B[1]*A[2][2]-A[1][2]*B[2])
+                              - B[0]*(A[1][0]*A[2][2]-A[1][2]*A[2][0])
+                              + A[0][2]*(A[1][0]*B[2]-B[1]*A[2][0])) / det;
+                    const c = (A[0][0]*(A[1][1]*B[2]-B[1]*A[2][1])
+                              - A[0][1]*(A[1][0]*B[2]-B[1]*A[2][0])
+                              + B[0]*(A[1][0]*A[2][1]-A[1][1]*A[2][0])) / det;
+                    return { 
+                        formula: `y = ${a.toFixed(3)}x² + ${b.toFixed(2)}x + ${c.toFixed(2)}`, 
+                        fn: x => a*x*x + b*x + c 
+                    };
+                }
+                case 'exponential': {
+                    const valid = data.filter(d => d.y > 0);
+                    if(valid.length < 2) return null;
+                    let sumX=0, sumLny=0, sumXLny=0, sumX2=0;
+                    valid.forEach(d => {
+                        const lny = Math.log(d.y);
+                        sumX += d.x; sumLny += lny;
+                        sumXLny += d.x*lny; sumX2 += d.x*d.x;
+                    });
+                    const m = valid.length;
+                    const b = (m*sumXLny - sumX*sumLny) / (m*sumX2 - sumX*sumX);
+                    const lna = (sumLny - b*sumX) / m;
+                    const a = Math.exp(lna);
+                    return { 
+                        formula: `y = ${a.toFixed(2)}·e^(${b.toFixed(3)}x)`, 
+                        fn: x => a * Math.exp(b*x) 
+                    };
+                }
+                case 'logarithmic': {
+                    const valid = data.filter(d => d.x > 0);
+                    if(valid.length < 2) return null;
+                    let sumLnx=0, sumY=0, sumLnxY=0, sumLnx2=0;
+                    valid.forEach(d => {
+                        const lnx = Math.log(d.x);
+                        sumLnx += lnx; sumY += d.y;
+                        sumLnxY += lnx*d.y; sumLnx2 += lnx*lnx;
+                    });
+                    const m = valid.length;
+                    const a = (m*sumLnxY - sumLnx*sumY) / (m*sumLnx2 - sumLnx*sumLnx);
+                    const b = (sumY - a*sumLnx) / m;
+                    return { 
+                        formula: `y = ${a.toFixed(2)}·lnx + ${b.toFixed(2)}`, 
+                        fn: x => x>0 ? a*Math.log(x) + b : null 
+                    };
+                }
+                case 'power': {
+                    const valid = data.filter(d => d.x > 0 && d.y > 0);
+                    if(valid.length < 2) return null;
+                    let sumLnx=0, sumLny=0, sumLnxLny=0, sumLnx2=0;
+                    valid.forEach(d => {
+                        const lnx = Math.log(d.x), lny = Math.log(d.y);
+                        sumLnx += lnx; sumLny += lny;
+                        sumLnxLny += lnx*lny; sumLnx2 += lnx*lnx;
+                    });
+                    const m = valid.length;
+                    const b = (m*sumLnxLny - sumLnx*sumLny) / (m*sumLnx2 - sumLnx*sumLnx);
+                    const lna = (sumLny - b*sumLnx) / m;
+                    const a = Math.exp(lna);
+                    return { 
+                        formula: `y = ${a.toFixed(2)}·x^${b.toFixed(2)}`, 
+                        fn: x => x>0 ? a * Math.pow(x, b) : null 
+                    };
+                }
+                case 'sin': {
+                    let sumY = 0;
+                    data.forEach(d => sumY += d.y);
+                    const k = sumY / n;
+                    let maxY = -Infinity, minY = Infinity;
+                    data.forEach(d => {
+                        if(d.y > maxY) maxY = d.y;
+                        if(d.y < minY) minY = d.y;
+                    });
+                    const A = (maxY - minY) / 2;
+                    const xRange = Math.max(...data.map(d=>d.x)) - Math.min(...data.map(d=>d.x));
+                    const omega = Math.PI / Math.max(xRange, 1);
+                    const phi = 0;
+                    return {
+                        formula: `y = ${A.toFixed(2)}sin(${omega.toFixed(2)}x) + ${k.toFixed(2)}`,
+                        fn: x => A * Math.sin(omega*x + phi) + k
+                    };
+                }
+            }
+            return null;
+        }
+
+        function doSportFit() {
+            if(sportPoints.length < 2) { alert('请先添加至少2个数据点'); return; }
+            const type = document.getElementById('sportFitType').value;
+            const result = fit(sportPoints, type);
+            if(!result) { alert('当前数据无法进行该类型拟合'); return; }
+            document.getElementById('sportFitResult').textContent = result.formula;
+            drawSportLine();
+            sportCtx.beginPath();
+            sportCtx.strokeStyle = '#EC4899';
+            sportCtx.lineWidth = 2;
+            sportCtx.setLineDash([6,4]);
+            let started = false;
+            const w = sportCanvas.getBoundingClientRect().width;
+            for(let px=sportConfig.originX; px < w-20; px += 2) {
+                const rx = (px - sportConfig.originX) / sportConfig.xScale;
+                const ry = result.fn(rx);
+                if(ry === null || ry < 0) continue;
+                const py = sportConfig.originY - (ry - sportConfig.yBase) * sportConfig.yScale;
+                if(py < 20 || py > sportConfig.originY) continue;
+                if(!started) { sportCtx.moveTo(px, py); started = true; }
+                else sportCtx.lineTo(px, py);
+            }
+            sportCtx.stroke();
+            sportCtx.setLineDash([]);
+        }
+
+        function doMusicFit() {
+            if(musicPoints.length < 2) { alert('请先添加至少2个数据点'); return; }
+            const type = document.getElementById('musicFitType').value;
+            const result = fit(musicPoints, type);
+            if(!result) { alert('当前数据无法进行该类型拟合'); return; }
+            document.getElementById('musicFitResult').textContent = result.formula;
+            drawMusicLine();
+            musicCtx.beginPath();
+            musicCtx.strokeStyle = '#F59E0B';
+            musicCtx.lineWidth = 2;
+            musicCtx.setLineDash([6,4]);
+            let started = false;
+            const w = musicCanvas.getBoundingClientRect().width;
+            for(let px=musicConfig.originX; px < w-20; px += 2) {
+                const rx = (px - musicConfig.originX) / musicConfig.xScale;
+                const ry = result.fn(rx);
+                if(ry === null || ry < 0) continue;
+                const py = musicConfig.originY - (ry - musicConfig.yBase) * musicConfig.yScale;
+                if(py < 20 || py > musicConfig.originY) continue;
+                if(!started) { musicCtx.moveTo(px, py); started = true; }
+                else musicCtx.lineTo(px, py);
+            }
+            musicCtx.stroke();
+            musicCtx.setLineDash([]);
+        }
+
+        function addRow(tableId) {
+            const table = document.getElementById(tableId).getElementsByTagName('tbody')[0];
+            const row = table.insertRow();
+            const colCount = table.rows[0].cells.length;
+            for(let i=0; i<colCount; i++) {
+                const cell = row.insertCell(i);
+                if(i === 0 && (tableId === 'sportDataTable' || tableId === 'musicDataTable')) {
+                    cell.textContent = table.rows.length;
+                } else if(i === colCount-1) {
+                    cell.innerHTML = '<button class="btn btn-danger btn-sm no-print" onclick="deleteRow(this)">删除</button>';
+                    cell.classList.add('no-print');
+                } else {
+                    const input = document.createElement('input');
+                    input.type = 'text';
+                    input.className = 'form-input';
+                    if(tableId === 'musicResearchTable') {
+                        if(i === 0) input.placeholder = '请输入乐曲名称';
+                        else if(i === 1) input.placeholder = '请输入横轴（自变量）';
+                        else if(i === 2) input.placeholder = '请输入纵轴（因变量）';
+                        else if(i === 3) input.placeholder = '请输入观察到的函数特征';
+                    }
+                    cell.appendChild(input);
+                }
+            }
+        }
+
+        function deleteRow(btn) {
+            const row = btn.closest('tr');
+            const tbody = row.parentElement;
+            if(tbody.rows.length > 1) {
+                row.remove();
+                const tableId = tbody.parentElement.id;
+                if(tableId === 'sportDataTable' || tableId === 'musicDataTable') {
+                    Array.from(tbody.rows).forEach((r, i) => {
+                        r.cells[0].textContent = i+1;
+                    });
+                }
+            } else {
+                alert('至少保留一行');
+            }
+        }
+
+        function toggleCollapse(id) {
+            const content = document.getElementById(id);
+            const icon = document.getElementById(id + '-icon');
+            content.classList.toggle('open');
+            icon.classList.toggle('fa-chevron-up');
+            icon.classList.toggle('fa-chevron-down');
+        }
+
+        function convertNote() {
+            document.getElementById('noteValue').textContent = document.getElementById('noteSelect').value;
+        }
+        function addMusicDataPoint() {
+            const noteVal = document.getElementById('noteSelect').value;
+            const tbody = document.querySelector('#musicDataTable tbody');
+            const row = tbody.insertRow();
+            const idx = tbody.rows.length;
+            row.innerHTML = `
+                <td>${idx}</td>
+                <td><input type="number" class="form-input music-x" value="${idx}"></td>
+                <td><input type="number" class="form-input music-y" value="${noteVal}"></td>
+                <td class="no-print"><button class="btn btn-danger btn-sm" onclick="deleteRow(this)">删除</button></td>
+            `;
+        }
+
+        function previewFile(input, previewId) {
+            const preview = document.getElementById(previewId);
+            preview.innerHTML = '';
+            const file = input.files[0];
+            if(!file) return;
+            if(file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    const img = document.createElement('img');
+                    img.src = e.target.result;
+                    img.className = 'preview-img';
+                    preview.appendChild(img);
+                };
+                reader.readAsDataURL(file);
+            } else if(file.type.startsWith('video/')) {
+                const video = document.createElement('video');
+                video.src = URL.createObjectURL(file);
+                video.controls = true;
+                video.className = 'preview-video';
+                preview.appendChild(video);
+            } else if(file.type.startsWith('audio/')) {
+                const audio = document.createElement('audio');
+                audio.src = URL.createObjectURL(file);
+                audio.controls = true;
+                audio.style.marginTop = '10px';
+                preview.appendChild(audio);
+            } else {
+                const p = document.createElement('p');
+                p.className = 'text-sm text-gray-600 mt-2';
+                p.innerHTML = `<i class="fa fa-file-o mr-1"></i> 已选择文件：${file.name}`;
+                preview.appendChild(p);
+            }
+        }
+
+        function calcScore() {
+            const totalEl = document.getElementById('totalScore');
+            if(!totalEl) return;
+            const scores = ['s1','s2','s3','s4','s5'];
+            let total = 0, count = 0;
+            scores.forEach(s => {
+                const val = document.querySelector(`input[name="${s}"]:checked`);
+                if(val) {
+                    count++;
+                    if(val.value === 'A') total += 4;
+                    else if(val.value === 'B') total += 3;
+                    else if(val.value === 'C') total += 2;
+                    else total += 1;
+                }
+            });
+            if(count === 0) {
+                totalEl.textContent = '请选择评分';
+                return;
+            }
+            const avg = total / count;
+            let grade = '合格 (C)';
+            if(avg >= 3.8) grade = '优秀 (A)';
+            else if(avg >= 3.0) grade = '良好 (B)';
+            else if(avg < 2) grade = '不合格 (D)';
+            totalEl.textContent = grade;
+        }
+
+        function saveData() {
+            const data = {};
+            if (selectedDate) {
+                const y = selectedDate.getFullYear();
+                const m = String(selectedDate.getMonth() + 1).padStart(2, '0');
+                const d = String(selectedDate.getDate()).padStart(2, '0');
+                data['selectedDate'] = `${y}-${m}-${d}`;
+            }
+            document.querySelectorAll('input, textarea, select').forEach(el => {
+                if(el.id) data[el.id] = el.value;
+            });
+            document.querySelectorAll('input[type="radio"]:checked').forEach(el => {
+                data[el.name] = el.value;
+            });
+            localStorage.setItem('funcProject_final', JSON.stringify(data));
+            alert('进度已保存');
+        }
+
+        function loadData() {
+            const saved = localStorage.getItem('funcProject_final');
+            if(!saved) return;
+            const data = JSON.parse(saved);
+            if (data.selectedDate) {
+                const parts = data.selectedDate.split('-');
+                if (parts.length === 3) {
+                    const y = parseInt(parts[0]), m = parseInt(parts[1])-1, d = parseInt(parts[2]);
+                    const date = new Date(y, m, d);
+                    if (!isNaN(date.getTime())) {
+                        selectDate(date);
+                    }
+                }
+            }
+            Object.keys(data).forEach(key => {
+                if (key === 'selectedDate') return;
+                const el = document.getElementById(key);
+                if(el) el.value = data[key];
+                const radio = document.querySelector(`input[name="${key}"][value="${data[key]}"]`);
+                if(radio) radio.checked = true;
+            });
+            calcScore();
+        }
+
+        function clearAll() {
+            if(confirm('确定清空所有内容？')) {
+                localStorage.removeItem('funcProject_final');
+                location.reload();
+            }
+        }
+
+        function submitTask() {
+            const stuName = document.getElementById('stuName').value.trim();
+            if(!stuName) {
+                alert('请先填写姓名再提交任务单');
+                document.getElementById('stuName').focus();
+                return;
+            }
+
+            const data = {};
+            if (selectedDate) {
+                const y = selectedDate.getFullYear();
+                const m = String(selectedDate.getMonth() + 1).padStart(2, '0');
+                const d = String(selectedDate.getDate()).padStart(2, '0');
+                data['selectedDate'] = `${y}-${m}-${d}`;
+            }
+            document.querySelectorAll('input, textarea, select').forEach(el => {
+                if(el.id) data[el.id] = el.value;
+            });
+            document.querySelectorAll('input[type="radio"]:checked').forEach(el => {
+                data[el.name] = el.value;
+            });
+            data['submittedAt'] = new Date().toLocaleString('zh-CN');
+            data['status'] = 'submitted';
+
+            localStorage.setItem('funcProject_submitted', JSON.stringify(data));
+            showSubmitSuccess(stuName);
+        }
+
+        function showSubmitSuccess(stuName) {
+            const modal = document.createElement('div');
+            modal.id = 'submitSuccessModal';
+            modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:9999;';
+            modal.innerHTML = `
+                <div style="background:white;padding:32px 40px;border-radius:12px;text-align:center;max-width:420px;box-shadow:0 20px 60px rgba(0,0,0,0.3);animation:scaleIn 0.3s ease;">
+                    <div style="width:72px;height:72px;background:#D1FAE5;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 18px;">
+                        <i class="fa fa-check" style="font-size:36px;color:#10B981;"></i>
+                    </div>
+                    <h3 style="font-size:22px;font-weight:600;color:#1F2937;margin-bottom:8px;">提交成功</h3>
+                    <p style="color:#6B7280;font-size:14px;margin-bottom:6px;line-height:1.6;">同学 <strong style="color:#4F46E5;">${stuName}</strong>，您的任务单已成功提交至系统</p>
+                    <p style="color:#9CA3AF;font-size:12px;margin-bottom:22px;">提交时间：${new Date().toLocaleString('zh-CN')}</p>
+                    <button onclick="document.getElementById('submitSuccessModal').remove()" style="background:linear-gradient(90deg,#4F46E5,#7C3AED);color:white;border:none;padding:9px 28px;border-radius:6px;cursor:pointer;font-size:14px;font-weight:500;transition:filter 0.2s;" onmouseover="this.style.filter='brightness(1.1)'" onmouseout="this.style.filter='brightness(1)'">确定</button>
+                </div>
+            `;
+            const style = document.createElement('style');
+            style.textContent = '@keyframes scaleIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }';
+            modal.querySelector('div').appendChild(style);
+            document.body.appendChild(modal);
+            modal.addEventListener('click', function(e) {
+                if(e.target === modal) modal.remove();
+            });
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>问卷设计助手</title>
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    padding:14px 14px 18px;background:#fff;color:#1f2430;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    font-size:14px;line-height:1.6;overflow-x:hidden;
+  }
+  h1{margin:0 0 4px;font-size:16px;font-weight:600;color:#171c28}
+  .sub{margin:0 0 12px;font-size:12px;color:#7b8397;line-height:1.5}
+  .card{margin-bottom:10px;padding:12px;border:1px solid #e7eaf3;border-radius:12px;background:#fff}
+  .card-title{margin-bottom:8px;font-size:13px;font-weight:600;color:#2a3142}
+  .field{margin-bottom:10px}
+  .field:last-child{margin-bottom:0}
+  label{display:block;margin-bottom:5px;font-size:13px;color:#404859}
+  input[type=text],select{
+    display:block;width:100%;height:36px;padding:0 10px;border:1px solid #dfe4ef;border-radius:9px;
+    background:#fbfcff;color:#1f2430;font-size:14px;font-family:inherit;outline:none;
+    transition:border-color .15s,box-shadow .15s;
+  }
+  input:focus,select:focus{border-color:#4f6ef7;background:#fff;box-shadow:0 0 0 3px rgba(79,110,247,.12)}
+  .row-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:13px;color:#404859}
+  .row-head b{color:#4f6ef7}
+  .hint{margin:6px 0 0;font-size:12px;color:#8a91a4;line-height:1.5}
+  .warn{margin:8px 0 0;padding:7px 9px;border-radius:8px;background:#fff4e8;color:#a25a12;font-size:12px}
+  .q-card{margin-bottom:8px;padding:10px;border:1px solid #e7eaf3;border-radius:10px;background:#fbfcff}
+  .q-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+  .q-no{font-size:12px;font-weight:600;color:#4f6ef7}
+  .q-del{
+    height:26px;padding:0 9px;border:1px solid #f0d9dc;border-radius:6px;background:#fff;
+    color:#c0454f;font-size:12px;font-family:inherit;cursor:pointer;
+  }
+  .q-del:hover{background:#fff5f6}
+  .q-field{margin-bottom:6px}
+  .q-field:last-child{margin-bottom:0}
+  .q-label{display:block;margin-bottom:3px;font-size:12px;color:#8a91a4}
+  .q-stem,.q-type{height:34px;font-size:13px}
+  .add-btn{
+    display:block;width:100%;height:36px;margin-top:2px;border:1px dashed #c3cdef;border-radius:9px;
+    background:#f8faff;color:#4f6ef7;font-size:13px;font-family:inherit;cursor:pointer;
+  }
+  .add-btn:hover{background:#f1f5ff;border-color:#9fb2f2}
+  .preview{
+    margin:0;padding:10px;border-radius:10px;background:#f7f8fc;color:#2d3448;
+    font-family:ui-monospace,SFMono-Regular,Consolas,"Courier New",monospace;
+    font-size:12px;line-height:1.7;white-space:pre-wrap;word-break:break-word;
+    max-height:260px;overflow:auto;
+  }
+  .actions{display:flex;gap:8px;margin-top:2px}
+  .btn{
+    flex:1 1 0;height:38px;border-radius:10px;border:1px solid transparent;font-family:inherit;
+    font-size:13px;font-weight:500;cursor:pointer;transition:background .15s,border-color .15s;
+  }
+  .btn-primary{background:#4f6ef7;color:#fff}
+  .btn-primary:hover{background:#4361e3}
+  .btn-ghost{background:#fff;border-color:#dfe4ef;color:#3c455c}
+  .btn-ghost:hover{border-color:#b9c2d8;background:#fafbff}
+  .status{min-height:18px;margin:8px 0 0;font-size:12px;color:#8a91a4;text-align:center}
+  .status.ok{color:#1f8a5a}
+</style>
+</head>
+<body>
+  <h1>问卷设计助手</h1>
+  <p class="sub">围绕调查目的，设计能统计、不诱导的题目。</p>
+
+  <div class="card">
+    <label for="title">问卷标题</label>
+    <input id="title" type="text" maxlength="60" value="校园节水情况调查问卷" />
+  </div>
+
+  <div class="card">
+    <div class="row-head"><span>题目列表</span><span>共 <b id="qCount">2</b> 题</span></div>
+    <div id="qList"></div>
+    <button id="addBtn" class="add-btn" type="button">+ 添加题目</button>
+    <p id="warn" class="warn" hidden></p>
+  </div>
+
+  <div class="card">
+    <div class="card-title">问卷提纲预览</div>
+    <pre id="preview" class="preview"></pre>
+  </div>
+
+  <div class="actions">
+    <button id="appendBtn" class="btn btn-primary" type="button">写入我的作答</button>
+    <button id="copyBtn" class="btn btn-ghost" type="button">复制结果</button>
+  </div>
+  <p id="status" class="status" role="status"></p>
+
+<script>
+(function () {
+  var titleEl = document.getElementById('title');
+  var qListEl = document.getElementById('qList');
+  var qCountEl = document.getElementById('qCount');
+  var warnEl = document.getElementById('warn');
+  var previewEl = document.getElementById('preview');
+  var statusEl = document.getElementById('status');
+  var TYPE_NAMES = { single: '单选', multi: '多选', text: '填空' };
+  var TYPE_KEYS = ['single', 'multi', 'text'];
+
+  var questions = [
+    { stem: '你平时是否会主动关紧水龙头？', type: 'single' },
+    { stem: '你在校园里见过哪些浪费水的现象？', type: 'multi' }
+  ];
+
+  function escapeAttr(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  function typeOptions(current) {
+    return TYPE_KEYS.map(function (key) {
+      return '<option value="' + key + '"' + (key === current ? ' selected' : '') + '>' + TYPE_NAMES[key] + '</option>';
+    }).join('');
+  }
+
+  function renderList() {
+    var html = '';
+    questions.forEach(function (q, i) {
+      html += '<div class="q-card">' +
+        '<div class="q-head"><span class="q-no">第 ' + (i + 1) + ' 题</span>' +
+        '<button class="q-del" type="button" data-del="' + i + '">删除</button></div>' +
+        '<div class="q-field"><label class="q-label">题干</label>' +
+        '<input class="q-stem" type="text" data-index="' + i + '" value="' + escapeAttr(q.stem) + '" placeholder="一题只问一件事" /></div>' +
+        '<div class="q-field"><label class="q-label">题型</label>' +
+        '<select class="q-type" data-index="' + i + '">' + typeOptions(q.type) + '</select></div>' +
+        '</div>';
+    });
+    if (!questions.length) {
+      html = '<p class="hint" style="margin:0 0 8px">还没有题目，点击下方按钮添加。</p>';
+    }
+    qListEl.innerHTML = html;
+    qCountEl.textContent = String(questions.length);
+  }
+
+  function buildOutline() {
+    var title = titleEl.value.trim() || '（未填写问卷标题）';
+    var lines = [title, ''];
+    if (!questions.length) {
+      lines.push('（暂无题目，请点击“+ 添加题目”）');
+      return lines.join('\n');
+    }
+    questions.forEach(function (q, i) {
+      var stem = q.stem.trim() || '（题干未填写）';
+      lines.push((i + 1) + '. ' + stem + '（' + TYPE_NAMES[q.type] + '）');
+      if (q.type === 'text') {
+        lines.push('   答：______________________________');
+      } else {
+        lines.push('   A. ______________________');
+        lines.push('   B. ______________________');
+        lines.push('   C. ______________________');
+        lines.push('   D. ______________________');
+      }
+      lines.push('');
+    });
+    return lines.join('\n').replace(/\s+$/, '');
+  }
+
+  function updatePreview() {
+    previewEl.textContent = buildOutline();
+    var missing = [];
+    questions.forEach(function (q, i) {
+      if (!q.stem.trim()) missing.push(i + 1);
+    });
+    if (missing.length) {
+      warnEl.hidden = false;
+      warnEl.textContent = missing.map(function (n) {
+        return '第 ' + n + ' 题尚未填写题干';
+      }).join('；');
+    } else {
+      warnEl.hidden = true;
+      warnEl.textContent = '';
+    }
+  }
+
+  function setStatus(msg, ok) {
+    statusEl.textContent = msg;
+    statusEl.className = 'status' + (ok ? ' ok' : '');
+  }
+
+  titleEl.addEventListener('input', updatePreview);
+
+  qListEl.addEventListener('input', function (e) {
+    var target = e.target;
+    if (!target.classList.contains('q-stem')) return;
+    var idx = parseInt(target.getAttribute('data-index'), 10);
+    if (!isFinite(idx) || !questions[idx]) return;
+    questions[idx].stem = target.value;
+    updatePreview();
+  });
+
+  qListEl.addEventListener('change', function (e) {
+    var target = e.target;
+    if (!target.classList.contains('q-type')) return;
+    var idx = parseInt(target.getAttribute('data-index'), 10);
+    if (!isFinite(idx) || !questions[idx]) return;
+    questions[idx].type = target.value;
+    updatePreview();
+  });
+
+  qListEl.addEventListener('click', function (e) {
+    var btn = e.target.closest ? e.target.closest('[data-del]') : null;
+    if (!btn) return;
+    var idx = parseInt(btn.getAttribute('data-del'), 10);
+    if (!isFinite(idx)) return;
+    questions.splice(idx, 1);
+    renderList();
+    updatePreview();
+  });
+
+  document.getElementById('addBtn').addEventListener('click', function () {
+    questions.push({ stem: '', type: 'single' });
+    renderList();
+    updatePreview();
+    var stemInputs = qListEl.querySelectorAll('.q-stem');
+    if (stemInputs.length) stemInputs[stemInputs.length - 1].focus();
+  });
+
+  document.getElementById('appendBtn').addEventListener('click', function () {
+    try {
+      window.parent.postMessage({ type: 'pbl-append', text: buildOutline() }, '*');
+      setStatus('已写入，请回到作答区查看', true);
+    } catch (err) {
+      setStatus('写入失败，请改用复制结果', false);
+    }
+  });
+
+  document.getElementById('copyBtn').addEventListener('click', function () {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(buildOutline()).then(function () {
+        setStatus('已复制，可直接粘贴', true);
+      }).catch(function () {
+        setStatus('复制失败，请手动选中复制', false);
+      });
+    } else {
+      setStatus('当前环境无法自动复制，请手动选中复制', false);
+    }
+  });
+
+  renderList();
+  updatePreview();
+})();
+</script>
+</body>
+</html>

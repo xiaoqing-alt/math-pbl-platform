@@ -1,0 +1,487 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>函数图像探究</title>
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    padding:14px 14px 18px;background:#fff;color:#1f2430;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    font-size:14px;line-height:1.6;overflow-x:hidden;
+  }
+  h1{margin:0 0 4px;font-size:16px;font-weight:600;color:#171c28}
+  .sub{margin:0 0 12px;font-size:12px;color:#7b8397;line-height:1.5}
+  .card{margin-bottom:10px;padding:12px;border:1px solid #e7eaf3;border-radius:12px;background:#fff}
+  .card-title{margin-bottom:8px;font-size:13px;font-weight:600;color:#2a3142}
+  label{display:block;margin-bottom:5px;font-size:13px;color:#404859}
+  select{
+    display:block;width:100%;height:36px;padding:0 10px;border:1px solid #dfe4ef;border-radius:9px;
+    background:#fbfcff;color:#1f2430;font-size:13.5px;font-family:inherit;outline:none;
+    transition:border-color .15s,box-shadow .15s;
+  }
+  select:focus{border-color:#4f6ef7;background:#fff;box-shadow:0 0 0 3px rgba(79,110,247,.12)}
+  .sliders{margin-top:10px}
+  .slider-row{display:flex;align-items:center;gap:8px;margin:0 0 9px}
+  .slider-row:last-child{margin-bottom:0}
+  .slider-row[hidden]{display:none}
+  .slider-row label{flex:none;width:22px;margin:0;font-size:13px;font-weight:600;color:#404859}
+  input[type=range]{
+    flex:1 1 auto;min-width:0;height:24px;margin:0;accent-color:#4f6ef7;
+    background:transparent;cursor:pointer;touch-action:pan-y;
+  }
+  output{
+    flex:none;width:44px;text-align:right;font-family:ui-monospace,SFMono-Regular,Consolas,"Courier New",monospace;
+    font-size:12px;color:#3b55d9;
+  }
+  .chart-box{border:1px solid #eef1f9;border-radius:10px;overflow:hidden;background:#fbfcff}
+  svg{display:block;width:100%;height:auto;user-select:none;-webkit-user-select:none}
+  .expr{
+    padding:10px 12px;border-radius:10px;background:#f2f5ff;color:#2c3550;
+    font-size:15px;font-weight:600;word-break:break-word;
+  }
+  .facts{margin-top:8px}
+  .fact{
+    position:relative;padding-left:14px;font-size:12.5px;color:#4a5268;line-height:1.65;margin-bottom:3px;
+  }
+  .fact:last-child{margin-bottom:0}
+  .fact::before{content:"•";position:absolute;left:2px;color:#4f6ef7}
+  .tip{margin:8px 0 0;font-size:12px;color:#8a91a4;line-height:1.5}
+  .actions{display:flex;gap:8px;margin-top:2px}
+  .btn{
+    flex:1 1 0;height:38px;border-radius:10px;border:1px solid transparent;font-family:inherit;
+    font-size:13px;font-weight:500;cursor:pointer;transition:background .15s,border-color .15s;
+  }
+  .btn-primary{background:#4f6ef7;color:#fff}
+  .btn-primary:hover{background:#4361e3}
+  .btn-ghost{background:#fff;border-color:#dfe4ef;color:#3c455c}
+  .btn-ghost:hover{border-color:#b9c2d8;background:#fafbff}
+  .status{min-height:18px;margin:8px 0 0;font-size:12px;color:#8a91a4;text-align:center}
+  .status.ok{color:#1f8a5a}
+</style>
+</head>
+<body>
+  <h1>函数图像探究</h1>
+  <p class="sub">拖动滑块改变系数，观察函数图像怎样随之变化。</p>
+
+  <div class="card">
+    <label for="fnType">函数类型</label>
+    <select id="fnType">
+      <option value="linear">一次函数 y = kx + b</option>
+      <option value="quad">二次函数 y = ax² + bx + c</option>
+      <option value="inv">反比例函数 y = k/x</option>
+    </select>
+    <div class="sliders">
+      <div class="slider-row" data-fn="linear">
+        <label for="kL">k</label>
+        <input id="kL" type="range" min="-5" max="5" step="0.5" value="1" />
+        <output id="kLOut">1</output>
+      </div>
+      <div class="slider-row" data-fn="linear">
+        <label for="bL">b</label>
+        <input id="bL" type="range" min="-10" max="10" step="1" value="1" />
+        <output id="bLOut">1</output>
+      </div>
+      <div class="slider-row" data-fn="quad" hidden>
+        <label for="aQ">a</label>
+        <input id="aQ" type="range" min="-3" max="3" step="0.25" value="1" />
+        <output id="aQOut">1</output>
+      </div>
+      <div class="slider-row" data-fn="quad" hidden>
+        <label for="bQ">b</label>
+        <input id="bQ" type="range" min="-10" max="10" step="1" value="0" />
+        <output id="bQOut">0</output>
+      </div>
+      <div class="slider-row" data-fn="quad" hidden>
+        <label for="cQ">c</label>
+        <input id="cQ" type="range" min="-10" max="10" step="1" value="0" />
+        <output id="cQOut">0</output>
+      </div>
+      <div class="slider-row" data-fn="inv" hidden>
+        <label for="kI">k</label>
+        <input id="kI" type="range" min="-10" max="10" step="1" value="2" />
+        <output id="kIOut">2</output>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="chart-box">
+      <svg id="plane" viewBox="0 0 320 260" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="函数图像坐标系">
+      </svg>
+    </div>
+    <p class="tip">改变 k 观察倾斜程度，改变 b 观察图像平移；换成二次函数后改变 a 观察开口方向。</p>
+  </div>
+
+  <div class="card">
+    <div class="expr" id="expr">y = x + 1</div>
+    <div class="facts" id="facts"></div>
+  </div>
+
+  <div class="actions">
+    <button id="appendBtn" class="btn btn-primary" type="button">写入我的作答</button>
+    <button id="resetBtn" class="btn btn-ghost" type="button">重置</button>
+  </div>
+  <p id="status" class="status" role="status"></p>
+
+<script>
+(function () {
+  'use strict';
+
+  var NS = 'http://www.w3.org/2000/svg';
+  var W = 320, H = 260;
+  var X0 = 45, Y0 = 15, SIZE = 230, SCALE = 11.5;
+
+  var plane = document.getElementById('plane');
+  var fnTypeEl = document.getElementById('fnType');
+  var exprEl = document.getElementById('expr');
+  var factsEl = document.getElementById('facts');
+  var statusEl = document.getElementById('status');
+
+  var curveGroup = null;
+  var markerGroup = null;
+  var rows = document.querySelectorAll('.slider-row');
+
+  var inputs = {
+    kL: document.getElementById('kL'),
+    bL: document.getElementById('bL'),
+    aQ: document.getElementById('aQ'),
+    bQ: document.getElementById('bQ'),
+    cQ: document.getElementById('cQ'),
+    kI: document.getElementById('kI')
+  };
+
+  var outputs = {
+    kL: document.getElementById('kLOut'),
+    bL: document.getElementById('bLOut'),
+    aQ: document.getElementById('aQOut'),
+    bQ: document.getElementById('bQOut'),
+    cQ: document.getElementById('cQOut'),
+    kI: document.getElementById('kIOut')
+  };
+
+  function svgEl(tag, attrs) {
+    var el = document.createElementNS(NS, tag);
+    if (attrs) {
+      Object.keys(attrs).forEach(function (k) { el.setAttribute(k, attrs[k]); });
+    }
+    return el;
+  }
+
+  function sx(x) { return X0 + (x + 10) * SCALE; }
+  function sy(y) { return Y0 + (10 - y) * SCALE; }
+
+  function trim(n) {
+    var v = Math.round(n * 100) / 100;
+    if (v === 0) v = 0;
+    return String(v);
+  }
+
+  function readNum(id) {
+    var v = parseFloat(inputs[id].value);
+    return isFinite(v) ? v : 0;
+  }
+
+  function termText(terms) {
+    var out = '';
+    terms.forEach(function (t) {
+      var c = Math.round(t.c * 100) / 100;
+      if (c === 0) return;
+      var a = Math.abs(c);
+      var coef = (t.body && a === 1) ? '' : trim(a);
+      if (out === '') {
+        out += (c < 0 ? '-' : '') + coef + t.body;
+      } else {
+        out += (c < 0 ? ' - ' : ' + ') + coef + t.body;
+      }
+    });
+    return out === '' ? '0' : out;
+  }
+
+  function buildPlane() {
+    var defs = svgEl('defs');
+    var clip = svgEl('clipPath', { id: 'plotClip' });
+    clip.appendChild(svgEl('rect', { x: X0, y: Y0, width: SIZE, height: SIZE }));
+    defs.appendChild(clip);
+    plane.appendChild(defs);
+
+    plane.appendChild(svgEl('rect', {
+      x: X0, y: Y0, width: SIZE, height: SIZE, fill: '#fbfcff'
+    }));
+
+    var grid = svgEl('g');
+    for (var v = -10; v <= 10; v++) {
+      if (v === 0) continue;
+      var strong = v % 5 === 0;
+      var color = strong ? '#dfe5f2' : '#eef1f9';
+      var width = strong ? '1.1' : '1';
+      grid.appendChild(svgEl('line', {
+        x1: sx(v), y1: Y0, x2: sx(v), y2: Y0 + SIZE, stroke: color, 'stroke-width': width
+      }));
+      grid.appendChild(svgEl('line', {
+        x1: X0, y1: sy(v), x2: X0 + SIZE, y2: sy(v), stroke: color, 'stroke-width': width
+      }));
+    }
+    plane.appendChild(grid);
+
+    plane.appendChild(svgEl('line', {
+      x1: X0, y1: sy(0), x2: X0 + SIZE, y2: sy(0), stroke: '#aab4cc', 'stroke-width': '1.3'
+    }));
+    plane.appendChild(svgEl('line', {
+      x1: sx(0), y1: Y0, x2: sx(0), y2: Y0 + SIZE, stroke: '#aab4cc', 'stroke-width': '1.3'
+    }));
+
+    [-10, -5, 5, 10].forEach(function (v) {
+      var tx = svgEl('text', {
+        x: sx(v), y: sy(0) + 13, 'font-size': '9', fill: '#9aa3b8', 'text-anchor': 'middle'
+      });
+      tx.textContent = String(v);
+      plane.appendChild(tx);
+
+      var ty = svgEl('text', {
+        x: sx(0) - 5, y: sy(v) + 3, 'font-size': '9', fill: '#9aa3b8', 'text-anchor': 'end'
+      });
+      ty.textContent = String(v);
+      plane.appendChild(ty);
+    });
+
+    var origin = svgEl('text', {
+      x: sx(0) - 6, y: sy(0) + 13, 'font-size': '9', fill: '#9aa3b8', 'text-anchor': 'end'
+    });
+    origin.textContent = 'O';
+    plane.appendChild(origin);
+
+    var xLab = svgEl('text', {
+      x: sx(10) + 6, y: sy(0) - 8, 'font-size': '10', fill: '#7b8397'
+    });
+    xLab.textContent = 'x';
+    plane.appendChild(xLab);
+
+    var yLab = svgEl('text', {
+      x: sx(0) + 6, y: Y0 + 9, 'font-size': '10', fill: '#7b8397'
+    });
+    yLab.textContent = 'y';
+    plane.appendChild(yLab);
+
+    curveGroup = svgEl('g', { 'clip-path': 'url(#plotClip)' });
+    plane.appendChild(curveGroup);
+
+    markerGroup = svgEl('g', { 'clip-path': 'url(#plotClip)' });
+    plane.appendChild(markerGroup);
+  }
+
+  function clearGroup(g) {
+    while (g.firstChild) g.removeChild(g.firstChild);
+  }
+
+  function addCurve(d) {
+    curveGroup.appendChild(svgEl('path', {
+      d: d, fill: 'none', stroke: '#4f6ef7', 'stroke-width': '2.2',
+      'stroke-linecap': 'round', 'stroke-linejoin': 'round'
+    }));
+  }
+
+  function addDot(x, y, color) {
+    if (x < -10 || x > 10 || y < -10 || y > 10) return;
+    markerGroup.appendChild(svgEl('circle', {
+      cx: sx(x), cy: sy(y), r: 4, fill: color, stroke: '#fff', 'stroke-width': 1.5
+    }));
+  }
+
+  function linearPath(k, b) {
+    var d = '';
+    var first = true;
+    for (var x = -10; x <= 10.0001; x += 0.05) {
+      var y = k * x + b;
+      d += (first ? 'M' : 'L') + sx(x).toFixed(2) + ' ' + sy(y).toFixed(2);
+      first = false;
+    }
+    return d;
+  }
+
+  function quadPath(a, b, c) {
+    var d = '';
+    var first = true;
+    for (var x = -10; x <= 10.0001; x += 0.04) {
+      var y = a * x * x + b * x + c;
+      d += (first ? 'M' : 'L') + sx(x).toFixed(2) + ' ' + sy(y).toFixed(2);
+      first = false;
+    }
+    return d;
+  }
+
+  function invPath(k) {
+    function branch(x0, x1) {
+      var d = '';
+      var first = true;
+      for (var x = x0; x <= x1 + 0.0001; x += 0.04) {
+        var y = k / x;
+        d += (first ? 'M' : 'L') + sx(x).toFixed(2) + ' ' + sy(y).toFixed(2);
+        first = false;
+      }
+      return d;
+    }
+    return branch(-10, -0.12) + branch(0.12, 10);
+  }
+
+  function render() {
+    var type = fnTypeEl.value;
+    var i;
+
+    for (i = 0; i < rows.length; i++) {
+      rows[i].hidden = rows[i].getAttribute('data-fn') !== type;
+    }
+    Object.keys(inputs).forEach(function (key) {
+      outputs[key].textContent = trim(readNum(key));
+    });
+
+    clearGroup(curveGroup);
+    clearGroup(markerGroup);
+
+    var exprStr = '';
+    var params = '';
+    var features = [];
+    var typeName = '';
+
+    if (type === 'linear') {
+      typeName = '一次函数';
+      var k = readNum('kL');
+      var b = readNum('bL');
+      exprStr = 'y = ' + termText([{ c: k, body: 'x' }, { c: b, body: '' }]);
+      params = 'k=' + trim(k) + '，b=' + trim(b);
+      if (k === 0) {
+        features.push('k=0：函数为常数函数，图像是水平直线 y=' + trim(b));
+      } else if (k > 0) {
+        features.push('k=' + trim(k) + '>0：y 随 x 增大而增大，图像从左向右上升');
+      } else {
+        features.push('k=' + trim(k) + '<0：y 随 x 增大而减小，图像从左向右下降');
+      }
+      features.push('与 y 轴交于 (0, ' + trim(b) + ')');
+      if (k !== 0) {
+        features.push('与 x 轴交于 (' + trim(-b / k) + ', 0)');
+      }
+      addCurve(linearPath(k, b));
+      addDot(0, b, '#f0a35e');
+    } else if (type === 'quad') {
+      typeName = '二次函数';
+      var a = readNum('aQ');
+      var bq = readNum('bQ');
+      var c = readNum('cQ');
+      exprStr = 'y = ' + termText([
+        { c: a, body: 'x²' }, { c: bq, body: 'x' }, { c: c, body: '' }
+      ]);
+      params = 'a=' + trim(a) + '，b=' + trim(bq) + '，c=' + trim(c);
+
+      if (a === 0) {
+        features.push('a=0 时不是二次函数，图像退化为直线 y=' + termText([{ c: bq, body: 'x' }, { c: c, body: '' }]));
+        features.push('与 y 轴交于 (0, ' + trim(c) + ')');
+      } else {
+        features.push('a=' + trim(a) + (a > 0 ? '>0：开口向上' : '<0：开口向下'));
+        var vx = -bq / (2 * a);
+        var vy = a * vx * vx + bq * vx + c;
+        features.push('对称轴：x = ' + trim(vx));
+        features.push('顶点：(' + trim(vx) + ', ' + trim(vy) + ')');
+        features.push('与 y 轴交于 (0, ' + trim(c) + ')');
+        features.push(a > 0
+          ? 'x<' + trim(vx) + ' 时 y 随 x 增大而减小；x>' + trim(vx) + ' 时 y 随 x 增大而增大'
+          : 'x<' + trim(vx) + ' 时 y 随 x 增大而增大；x>' + trim(vx) + ' 时 y 随 x 增大而减小');
+
+        markerGroup.appendChild(svgEl('line', {
+          x1: sx(vx), y1: Y0, x2: sx(vx), y2: Y0 + SIZE,
+          stroke: '#f0a35e', 'stroke-width': '1.2', 'stroke-dasharray': '4 3'
+        }));
+        addDot(vx, vy, '#e8618c');
+      }
+      addCurve(quadPath(a, bq, c));
+      addDot(0, c, '#f0a35e');
+    } else {
+      typeName = '反比例函数';
+      var ki = readNum('kI');
+      params = 'k=' + trim(ki);
+      if (ki === 0) {
+        exprStr = 'y = k/x（k=0 时不成立）';
+        features.push('k 不能为 0，请把滑块调离 0');
+        features.push('与 y 轴没有交点');
+      } else {
+        exprStr = 'y = ' + (ki === 1 ? '' : (ki === -1 ? '-' : trim(ki))) + '/x';
+        features.push(ki > 0
+          ? 'k=' + trim(ki) + '>0：图像在第一、三象限，在每个象限内 y 随 x 增大而减小'
+          : 'k=' + trim(ki) + '<0：图像在第二、四象限，在每个象限内 y 随 x 增大而增大');
+        features.push('与坐标轴没有交点（x≠0，y≠0）');
+        addCurve(invPath(ki));
+      }
+    }
+
+    exprEl.textContent = exprStr;
+    factsEl.innerHTML = '';
+    var allFacts = [params].concat(features);
+    allFacts.forEach(function (text) {
+      var div = document.createElement('div');
+      div.className = 'fact';
+      div.textContent = text;
+      factsEl.appendChild(div);
+    });
+
+    return {
+      typeName: typeName,
+      expr: exprStr,
+      params: params,
+      features: features
+    };
+  }
+
+  function buildRecord(info) {
+    return [
+      '函数图像探究记录',
+      '函数类型：' + info.typeName,
+      '解析式：' + info.expr,
+      '参数：' + info.params,
+      '关键特征：' + info.features.join('；')
+    ].join('\n');
+  }
+
+  function setStatus(msg, ok) {
+    statusEl.textContent = msg;
+    statusEl.className = 'status' + (ok ? ' ok' : '');
+  }
+
+  var currentInfo = null;
+
+  function update() {
+    currentInfo = render();
+  }
+
+  fnTypeEl.addEventListener('change', update);
+  Object.keys(inputs).forEach(function (key) {
+    inputs[key].addEventListener('input', update);
+  });
+
+  document.getElementById('appendBtn').addEventListener('click', function () {
+    try {
+      window.parent.postMessage({ type: 'pbl-append', text: buildRecord(currentInfo) }, '*');
+      setStatus('已写入，请回到作答区查看', true);
+    } catch (err) {
+      setStatus('写入失败，请稍后再试', false);
+    }
+  });
+
+  document.getElementById('resetBtn').addEventListener('click', function () {
+    fnTypeEl.value = 'linear';
+    inputs.kL.value = '1';
+    inputs.bL.value = '1';
+    inputs.aQ.value = '1';
+    inputs.bQ.value = '0';
+    inputs.cQ.value = '0';
+    inputs.kI.value = '2';
+    update();
+    setStatus('');
+  });
+
+  buildPlane();
+  update();
+})();
+</script>
+</body>
+</html>

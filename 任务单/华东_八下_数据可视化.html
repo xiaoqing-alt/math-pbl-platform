@@ -1,0 +1,1579 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数据可视化 · 项目学习任务单</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <!-- Chart.js 及 Boxplot 插件 -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-boxplot@2.1.0/dist/chartjs-chart-boxplot.min.js"></script>
+    <style>
+        /* 样式与之前相同，省略以节省篇幅，实际使用时保留完整样式 */
+        * { box-sizing: border-box; }
+        body {
+            background: linear-gradient(135deg, #f0f9ff 0%, #f5f3ff 100%);
+            min-height: 100vh;
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+        .step-card {
+            transition: all 0.3s ease;
+            background: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+        .step-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px -5px rgba(79, 70, 229, 0.1);
+        }
+        .section-header {
+            background: linear-gradient(90deg, #4F46E5 0%, #06B6D4 100%);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 12px 12px 0 0;
+            font-weight: 600;
+        }
+        .section-header.teal { background: linear-gradient(90deg, #0D9488 0%, #06B6D4 100%); }
+        .section-header.orange { background: linear-gradient(90deg, #EA580C 0%, #F59E0B 100%); }
+        .section-header.purple { background: linear-gradient(90deg, #7C3AED 0%, #8B5CF6 100%); }
+        .form-input {
+            width: 100%;
+            border: 1px solid #D1D5DB;
+            border-radius: 6px;
+            padding: 8px 12px;
+            transition: all 0.2s;
+            outline: none;
+            font-size: 14px;
+            background: #fff;
+        }
+        .form-input:focus {
+            border-color: #4F46E5;
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+        .form-input::placeholder { color: #9CA3AF; }
+        .form-input-sm { padding: 4px 8px; font-size: 13px; }
+        .form-input.placeholder-gray::placeholder { color: #B0B0B0; font-style: normal; }
+
+        /* 日历样式略... 完整代码中包含 */
+        .date-picker-wrapper { position: relative; width: 100%; height: 38px; }
+        .date-picker-wrapper .date-input-display {
+            width: 100%; height: 100%;
+            border: 1px solid #D1D5DB; border-radius: 6px;
+            padding: 0 12px; font-size: 14px; background: #fff;
+            cursor: pointer; display: flex; align-items: center;
+            color: #111827; transition: border-color 0.2s;
+        }
+        .date-picker-wrapper .date-input-display:hover { border-color: #4F46E5; }
+        .date-picker-wrapper .date-input-display .placeholder { color: #9CA3AF; }
+        .date-picker-wrapper .date-input-display .clear-btn {
+            margin-left: auto; background: none; border: none;
+            color: #9CA3AF; cursor: pointer; font-size: 16px; padding: 0 4px;
+        }
+        .date-picker-wrapper .date-input-display .clear-btn:hover { color: #EF4444; }
+        .calendar-popup {
+            position: absolute; top: 42px; left: 0; width: 280px;
+            background: #ffffff; border: 1px solid #D1D5DB;
+            border-radius: 10px; box-shadow: 0 12px 30px rgba(0,0,0,0.15);
+            z-index: 999; padding: 16px 14px 12px; display: none; font-size: 14px;
+        }
+        .calendar-popup.open { display: block; }
+        .calendar-popup .cal-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 12px; font-weight: 600; color: #1F2937;
+        }
+        .calendar-popup .cal-header button {
+            background: none; border: none; cursor: pointer;
+            font-size: 18px; color: #6B7280; padding: 0 6px; border-radius: 4px;
+            transition: background 0.1s;
+        }
+        .calendar-popup .cal-header button:hover { background: #F3F4F6; }
+        .calendar-popup .cal-header .month-year { min-width: 120px; text-align: center; }
+        .calendar-popup .weekdays {
+            display: grid; grid-template-columns: repeat(7, 1fr);
+            text-align: center; font-size: 12px; color: #6B7280;
+            font-weight: 500; margin-bottom: 6px;
+        }
+        .calendar-popup .days-grid {
+            display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px;
+        }
+        .calendar-popup .days-grid .day-cell {
+            aspect-ratio: 1/1; display: flex; align-items: center;
+            justify-content: center; border-radius: 50%; cursor: pointer;
+            transition: background 0.1s; font-size: 14px; color: #1F2937;
+            background: transparent; border: none; font-weight: 400;
+            width: 100%; padding: 0;
+        }
+        .calendar-popup .days-grid .day-cell:hover { background: #EEF2FF; }
+        .calendar-popup .days-grid .day-cell.selected { background: #4F46E5; color: white; font-weight: 500; }
+        .calendar-popup .days-grid .day-cell.other-month { color: #D1D5DB; }
+        .calendar-popup .days-grid .day-cell.today { border: 1px solid #4F46E5; }
+        .calendar-popup .cal-footer {
+            display: flex; justify-content: space-between;
+            margin-top: 12px; padding-top: 10px; border-top: 1px solid #F3F4F6;
+        }
+        .calendar-popup .cal-footer button {
+            background: none; border: none; font-size: 13px;
+            cursor: pointer; padding: 4px 12px; border-radius: 4px;
+            color: #4F46E5; font-weight: 500; transition: background 0.1s;
+        }
+        .calendar-popup .cal-footer button:hover { background: #EEF2FF; }
+        .calendar-popup .cal-footer .btn-clear { color: #EF4444; }
+        .calendar-popup .cal-footer .btn-clear:hover { background: #FEF2F2; }
+
+        .btn {
+            padding: 7px 16px; border-radius: 6px; font-weight: 500;
+            cursor: pointer; border: none; transition: all 0.2s; font-size: 14px;
+        }
+        .btn-primary { background: linear-gradient(90deg, #4F46E5, #7C3AED); color: white; }
+        .btn-primary:hover { filter: brightness(1.1); }
+        .btn-danger { background-color: #EF4444; color: white; }
+        .btn-danger:hover { background-color: #DC2626; }
+        .btn-outline { border: 1px solid #4F46E5; color: #4F46E5; background: white; }
+        .btn-outline:hover { background: #EEF2FF; }
+        .btn-sm { padding: 4px 12px; font-size: 12px; }
+        .btn-teal { background: linear-gradient(90deg, #0D9488, #06B6D4); color: white; }
+        .btn-teal:hover { filter: brightness(1.1); }
+        .btn-orange { background: linear-gradient(90deg, #EA580C, #F59E0B); color: white; }
+        .btn-orange:hover { filter: brightness(1.1); }
+
+        .data-table {
+            width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 14px;
+        }
+        .data-table th, .data-table td {
+            border: 1px solid #E5E7EB; padding: 6px 8px;
+            text-align: center; vertical-align: middle;
+        }
+        .data-table th {
+            background-color: #F3F4F6; font-weight: 600; color: #374151;
+        }
+        .data-table .form-input { min-width: 60px; }
+
+        .tip-box {
+            background: #F0F9FF; border-left: 4px solid #0EA5E9;
+            padding: 10px 15px; border-radius: 0 6px 6px 0;
+            font-size: 13px; color: #0369A1; margin: 10px 0; line-height: 1.5;
+        }
+        .tip-box.teal { background: #F0FDFA; border-color: #0D9488; color: #0F766E; }
+        .tip-box.orange { background: #FFF7ED; border-color: #EA580C; color: #9A3412; }
+        .collapse-content {
+            max-height: 0; overflow: hidden; transition: max-height 0.4s ease-out;
+        }
+        .collapse-content.open { max-height: 8000px; }
+        .step-number {
+            width: 32px; height: 32px; border-radius: 50%;
+            background: linear-gradient(135deg, #4F46E5, #8B5CF6);
+            color: white; display: inline-flex; align-items: center;
+            justify-content: center; font-weight: bold; margin-right: 10px;
+            flex-shrink: 0; font-size: 14px;
+        }
+        .step-number.teal { background: linear-gradient(135deg, #0D9488, #06B6D4); }
+        .step-number.orange { background: linear-gradient(135deg, #EA580C, #F59E0B); }
+        .step-number.purple { background: linear-gradient(135deg, #7C3AED, #8B5CF6); }
+
+        .upload-box {
+            border: 2px dashed #D1D5DB; border-radius: 8px; padding: 20px;
+            text-align: center; cursor: pointer; transition: all 0.2s;
+            color: #6B7280;
+        }
+        .upload-box:hover { border-color: #4F46E5; background: #EEF2FF; color: #4F46E5; }
+        .upload-box input { display: none; }
+        .preview-img { max-width: 100%; max-height: 200px; margin-top: 10px; border-radius: 6px; border: 1px solid #E5E7EB; }
+
+        .radio-score label {
+            display: inline-flex; align-items: center; margin-right: 12px;
+            cursor: pointer; font-size: 14px;
+        }
+
+        .proj-intro-grid {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;
+        }
+        .proj-intro-grid .intro-item {
+            background: #F8FAFC; border-radius: 8px; padding: 14px 18px;
+            border: 1px solid #E5E7EB;
+        }
+        .proj-intro-grid .intro-item h4 {
+            font-weight: 600; color: #374151; font-size: 0.95rem; margin-bottom: 4px;
+        }
+        .proj-intro-grid .intro-item p, .proj-intro-grid .intro-item ul {
+            font-size: 0.9rem; color: #4B5563; line-height: 1.6;
+        }
+        .proj-intro-grid .intro-item ul {
+            list-style: disc; padding-left: 18px; margin: 2px 0;
+        }
+        .knowledge-tags {
+            display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px;
+        }
+        .knowledge-tags span {
+            background: #EEF2FF; color: #4338CA; font-size: 0.75rem;
+            padding: 2px 12px; border-radius: 20px; font-weight: 500;
+        }
+        @media (max-width: 640px) {
+            .proj-intro-grid { grid-template-columns: 1fr; }
+        }
+
+        .stat-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 8px; margin: 8px 0;
+        }
+        .stat-item {
+            background: #F9FAFB; border: 1px solid #E5E7EB;
+            border-radius: 6px; padding: 6px 10px; text-align: center;
+        }
+        .stat-item label { font-size: 11px; color: #6B7280; display: block; }
+        .stat-item .form-input {
+            text-align: center; font-weight: 600; font-size: 14px;
+            padding: 2px 4px; margin-top: 2px;
+        }
+
+        .chart-container {
+            background: #ffffff; border: 1px solid #E5E7EB;
+            border-radius: 8px; padding: 12px; margin: 10px 0;
+            position: relative; min-height: 200px;
+        }
+        .chart-container canvas { width: 100% !important; height: auto !important; max-height: 280px; }
+
+        @media print {
+            .no-print { display: none !important; }
+            body { background: white; }
+            .step-card { box-shadow: none; border: 1px solid #ccc; }
+        }
+    </style>
+</head>
+<body class="py-6 px-4">
+    <div class="max-w-6xl mx-auto">
+        <!-- 标题区 -->
+        <header class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">数据可视化</h1>
+            <p class="text-gray-500">跨学科探究 · 学业成绩 · 种子发芽 · 气温降水</p>
+            <div class="flex justify-center gap-3 mt-4 no-print">
+                <button class="btn btn-outline" onclick="saveData()">
+                    <i class="fa fa-save mr-1"></i> 保存进度
+                </button>
+                <button class="btn btn-outline" onclick="window.print()">
+                    <i class="fa fa-print mr-1"></i> 打印导出
+                </button>
+                <button class="btn btn-outline" onclick="clearAll()">
+                    <i class="fa fa-trash-o mr-1"></i> 清空重置
+                </button>
+            </div>
+        </header>
+
+        <!-- 基础信息 -->
+        <section class="step-card mb-6">
+            <div class="section-header flex items-center">
+                <i class="fa fa-user-circle mr-2"></i> 基础信息
+            </div>
+            <div class="p-5">
+                <table class="data-table">
+                    <thead><tr><th style="width:33%;">姓名</th><th style="width:33%;">班级</th><th style="width:34%;">填写日期</th></tr></thead>
+                    <tbody>
+                        <tr>
+                            <td><input type="text" class="form-input" id="stuName" placeholder="请输入姓名"></td>
+                            <td><input type="text" class="form-input" id="stuClass" placeholder="请输入班级"></td>
+                            <td>
+                                <div class="date-picker-wrapper" id="datePickerWrapper">
+                                    <div class="date-input-display" id="dateDisplay" onclick="toggleCalendar()">
+                                        <span id="dateDisplayText" class="placeholder">年 / 月 / 日</span>
+                                        <button class="clear-btn" onclick="event.stopPropagation(); clearDate();">✕</button>
+                                    </div>
+                                    <div class="calendar-popup" id="calendarPopup">
+                                        <div class="cal-header">
+                                            <button onclick="changeMonth(-1)">‹</button>
+                                            <span class="month-year" id="calMonthYear">2026年 8月</span>
+                                            <button onclick="changeMonth(1)">›</button>
+                                        </div>
+                                        <div class="weekdays"><span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span></div>
+                                        <div class="days-grid" id="daysGrid"></div>
+                                        <div class="cal-footer">
+                                            <button onclick="selectToday()">今天</button>
+                                            <button class="btn-clear" onclick="clearDate();">清除</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+                <h4 class="font-semibold text-gray-700 mt-4 mb-2">
+                    <i class="fa fa-users text-primary mr-1"></i> 团队分工
+                </h4>
+                <div class="flex justify-end mb-2 no-print">
+                    <button class="btn btn-primary btn-sm" onclick="addRow('teamTable')">
+                        <i class="fa fa-plus mr-1"></i> 添加成员
+                    </button>
+                </div>
+                <table class="data-table" id="teamTable">
+                    <thead><tr><th style="width:30%;">成员姓名</th><th style="width:55%;">承担具体任务</th><th style="width:15%;" class="no-print">操作</th></tr></thead>
+                    <tbody>
+                        <tr>
+                            <td><input type="text" class="form-input" placeholder="成员姓名"></td>
+                            <td><input type="text" class="form-input" placeholder="如：数据采集、图表绘制、海报制作"></td>
+                            <td class="no-print"><button class="btn btn-danger btn-sm" onclick="deleteRow(this)">删除</button></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- 项目简介 -->
+        <section class="step-card mb-6">
+            <div class="section-header flex items-center">
+                <i class="fa fa-bullseye mr-2"></i> 项目简介
+            </div>
+            <div class="p-5">
+                <div class="proj-intro-grid">
+                    <div class="intro-item">
+                        <h4><i class="fa fa-flag-checkered text-primary mr-1"></i> 项目背景</h4>
+                        <p>数据可视化是将抽象数据转化为直观图形的重要技能。无论是分析学业成绩、观察种子发芽，还是探究城市气候，数据可视化都能帮助我们更清晰地发现规律、理解现象。本项目通过三个贴近生活的主题，引导同学们经历"提出问题—数据采集—图表绘制—分析结论"的完整研究过程，培养数据素养和跨学科思维。</p>
+                    </div>
+                    <div class="intro-item">
+                        <h4><i class="fa fa-tasks text-primary mr-1"></i> 项目目标</h4>
+                        <ul>
+                            <li>掌握统计图表的绘制与解读方法；</li>
+                            <li>能根据问题选择合适的图表类型；</li>
+                            <li>经历完整的跨学科探究过程，提升数据分析与表达能力；</li>
+                            <li>培养用数据说话的科学态度和团队协作能力。</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="mt-3 intro-item" style="background:#F8FAFC; border-radius:8px; padding:12px 18px; border:1px solid #E5E7EB;">
+                    <h4 style="font-weight:600; color:#374151; font-size:0.95rem; margin-bottom:2px;"><i class="fa fa-puzzle-piece text-primary mr-1"></i> 涉及知识</h4>
+                    <div class="knowledge-tags">
+                        <span>统计图表</span>
+                        <span>数据分析</span>
+                        <span>平均数/中位数/方差</span>
+                        <span>数据采集与处理</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 任务一：学业成绩 -->
+        <section class="step-card mb-6">
+            <div class="section-header flex items-center justify-between">
+                <span><i class="fa fa-bar-chart mr-2"></i> 任务一：学业成绩的比较</span>
+                <button class="text-white/80 hover:text-white no-print" onclick="toggleCollapse('task1')">
+                    <i class="fa fa-chevron-down" id="task1-icon"></i>
+                </button>
+            </div>
+            <div class="collapse-content open" id="task1">
+                <div class="p-5 space-y-6">
+                    <!-- 步骤1 -->
+                    <div>
+                        <div class="flex items-center mb-3">
+                            <div class="step-number">1</div>
+                            <h4 class="font-semibold text-lg text-gray-800">提出研究问题</h4>
+                        </div>
+                        <div class="tip-box">
+                            <i class="fa fa-lightbulb-o mr-1"></i>
+                            选题方向：横向对比（两班同科）、纵向对比（本班多次考试）、相关性研究（不同学科关联）
+                        </div>
+                        <div class="grid md:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-600 mb-1">研究主题</label>
+                                <input type="text" class="form-input" id="scoreTopic" placeholder="例：两班数学成绩差异分析">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-600 mb-1">研究问题（具体）</label>
+                                <input type="text" class="form-input" id="scoreQuestion" placeholder="例：八(1)班和八(2)班数学成绩是否存在显著差异？">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 步骤2 -->
+                    <div>
+                        <div class="flex items-center mb-3">
+                            <div class="step-number">2</div>
+                            <h4 class="font-semibold text-lg text-gray-800">数据采集与统计量计算</h4>
+                        </div>
+                        <div class="tip-box">
+                            <i class="fa fa-database mr-1"></i>
+                            请录入成绩数据（可脱敏处理，不显示姓名），系统自动计算统计量。
+                        </div>
+                        <div class="flex justify-end mb-2 no-print">
+                            <button class="btn btn-primary btn-sm" onclick="addRow('scoreDataTable')">
+                                <i class="fa fa-plus mr-1"></i> 添加成绩
+                            </button>
+                        </div>
+                        <table class="data-table" id="scoreDataTable">
+                            <thead><tr><th>序号</th><th>班级</th><th>学科</th><th>成绩</th><th class="no-print">操作</th></tr></thead>
+                            <tbody>
+                                <tr>
+                                    <td>1</td>
+                                    <td><input type="text" class="form-input form-input-sm" placeholder="班级"></td>
+                                    <td><input type="text" class="form-input form-input-sm" placeholder="学科"></td>
+                                    <td><input type="number" class="form-input form-input-sm score-val" placeholder="成绩"></td>
+                                    <td class="no-print"><button class="btn btn-danger btn-sm" onclick="deleteRow(this)">删除</button></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <div class="stat-grid">
+                            <div class="stat-item"><label>平均分</label><input type="text" class="form-input form-input-sm" id="scoreMean" readonly></div>
+                            <div class="stat-item"><label>中位数</label><input type="text" class="form-input form-input-sm" id="scoreMedian" readonly></div>
+                            <div class="stat-item"><label>方差</label><input type="text" class="form-input form-input-sm" id="scoreVariance" readonly></div>
+                            <div class="stat-item"><label>最高分</label><input type="text" class="form-input form-input-sm" id="scoreMax" readonly></div>
+                            <div class="stat-item"><label>最低分</label><input type="text" class="form-input form-input-sm" id="scoreMin" readonly></div>
+                        </div>
+                        <button class="btn btn-primary btn-sm no-print" onclick="calcScoreStats()">
+                            <i class="fa fa-calculator mr-1"></i> 计算统计量
+                        </button>
+                    </div>
+
+                    <!-- 步骤3 -->
+                    <div>
+                        <div class="flex items-center mb-3">
+                            <div class="step-number">3</div>
+                            <h4 class="font-semibold text-lg text-gray-800">图表生成与结论</h4>
+                        </div>
+                        <div class="grid md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-600 mb-1">选用的图表类型</label>
+                                <select class="form-input" id="scoreChartType">
+                                    <option value="box">箱线图</option>
+                                    <option value="histogram">直方图</option>
+                                    <option value="line">折线图</option>
+                                    <option value="scatter">散点图</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-600 mb-1">图表反映的核心现象</label>
+                                <input type="text" class="form-input" id="scorePhenomenon" placeholder="如：两班平均分差距约5分">
+                            </div>
+                        </div>
+                        <div class="chart-container" id="scoreChartContainer">
+                            <canvas id="scoreChartCanvas"></canvas>
+                        </div>
+                        <button class="btn btn-primary btn-sm no-print" onclick="generateScoreChart()">
+                            <i class="fa fa-line-chart mr-1"></i> 生成图表
+                        </button>
+                        <div class="mt-3">
+                            <label class="block text-sm font-medium text-gray-600 mb-1">分析结论</label>
+                            <textarea class="form-input h-20 resize-none" id="scoreConclusion" placeholder="根据图表分析，回答研究问题"></textarea>
+                        </div>
+                        <div class="mt-3">
+                            <label class="block text-sm font-medium text-gray-600 mb-1">学习改进建议</label>
+                            <textarea class="form-input h-20 resize-none" id="scoreSuggestion" placeholder="班级或个人层面的改进建议"></textarea>
+                        </div>
+                    </div>
+
+                    <!-- 步骤4 -->
+                    <div>
+                        <div class="flex items-center mb-3">
+                            <div class="step-number">4</div>
+                            <h4 class="font-semibold text-lg text-gray-800">成果海报</h4>
+                        </div>
+                        <div class="upload-box" onclick="document.getElementById('scorePoster').click()">
+                            <i class="fa fa-file-image-o text-2xl mb-2"></i>
+                            <p>点击上传成果海报（图片或PDF）</p>
+                            <input type="file" id="scorePoster" accept="image/*,.pdf" onchange="previewFile(this, 'scorePosterPreview')">
+                        </div>
+                        <div id="scorePosterPreview"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 任务二：种子发芽 -->
+        <section class="step-card mb-6">
+            <div class="section-header teal flex items-center justify-between">
+                <span><i class="fa fa-leaf mr-2"></i> 任务二：种子发芽率的比较</span>
+                <button class="text-white/80 hover:text-white no-print" onclick="toggleCollapse('task2')">
+                    <i class="fa fa-chevron-down" id="task2-icon"></i>
+                </button>
+            </div>
+            <div class="collapse-content open" id="task2">
+                <div class="p-5 space-y-6">
+                    <!-- 步骤1 -->
+                    <div>
+                        <div class="flex items-center mb-3">
+                            <div class="step-number teal">1</div>
+                            <h4 class="font-semibold text-lg text-gray-800">提出研究问题与实验方案</h4>
+                        </div>
+                        <div class="tip-box teal">
+                            <i class="fa fa-lightbulb-o mr-1"></i>
+                            选题参考：对比实验（两种种子发芽差异）、追踪观测（一种种子生长过程）
+                        </div>
+                        <div class="grid md:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-600 mb-1">研究主题</label>
+                                <input type="text" class="form-input" id="seedTopic" placeholder="例：绿豆与黄豆发芽率对比">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-600 mb-1">实验方案简述</label>
+                                <input type="text" class="form-input" id="seedPlan" placeholder="如：各50粒种子，相同光照/温度，每日记录">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 步骤2 -->
+                    <div>
+                        <div class="flex items-center mb-3">
+                            <div class="step-number teal">2</div>
+                            <h4 class="font-semibold text-lg text-gray-800">每日观测数据</h4>
+                        </div>
+                        <div class="flex justify-end mb-2 no-print">
+                            <button class="btn btn-teal btn-sm" onclick="addRow('seedDataTable')">
+                                <i class="fa fa-plus mr-1"></i> 添加记录
+                            </button>
+                        </div>
+                        <table class="data-table" id="seedDataTable">
+                            <thead><tr><th>序号</th><th>天数</th><th>种子类型</th><th>发芽数</th><th>幼苗高度(cm)</th><th class="no-print">操作</th></tr></thead>
+                            <tbody>
+                                <tr>
+                                    <td>1</td>
+                                    <td><input type="number" class="form-input form-input-sm placeholder-gray" placeholder="1"></td>
+                                    <td><input type="text" class="form-input form-input-sm placeholder-gray" placeholder="绿豆"></td>
+                                    <td><input type="number" class="form-input form-input-sm placeholder-gray" placeholder="5"></td>
+                                    <td><input type="number" class="form-input form-input-sm placeholder-gray" placeholder="0.5"></td>
+                                    <td class="no-print"><button class="btn btn-danger btn-sm" onclick="deleteRow(this)">删除</button></td>
+                                </tr>
+                                <tr>
+                                    <td>2</td>
+                                    <td><input type="number" class="form-input form-input-sm placeholder-gray" placeholder="2"></td>
+                                    <td><input type="text" class="form-input form-input-sm placeholder-gray" placeholder="绿豆"></td>
+                                    <td><input type="number" class="form-input form-input-sm placeholder-gray" placeholder="12"></td>
+                                    <td><input type="number" class="form-input form-input-sm placeholder-gray" placeholder="1.2"></td>
+                                    <td class="no-print"><button class="btn btn-danger btn-sm" onclick="deleteRow(this)">删除</button></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- 步骤3 -->
+                    <div>
+                        <div class="flex items-center mb-3">
+                            <div class="step-number teal">3</div>
+                            <h4 class="font-semibold text-lg text-gray-800">图表生成与数据分析</h4>
+                        </div>
+                        <div class="grid md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-600 mb-1">选用的图表类型</label>
+                                <select class="form-input" id="seedChartType">
+                                    <option value="bar">条形图</option>
+                                    <option value="line">折线图</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-600 mb-1">数据反映的规律</label>
+                                <input type="text" class="form-input" id="seedPattern" placeholder="如：绿豆发芽速度更快">
+                            </div>
+                        </div>
+                        <div class="chart-container" id="seedChartContainer">
+                            <canvas id="seedChartCanvas"></canvas>
+                        </div>
+                        <button class="btn btn-teal btn-sm no-print" onclick="generateSeedChart()">
+                            <i class="fa fa-line-chart mr-1"></i> 生成图表
+                        </button>
+                        <div class="mt-3">
+                            <label class="block text-sm font-medium text-gray-600 mb-1">实验结论</label>
+                            <textarea class="form-input h-20 resize-none" id="seedConclusion" placeholder="根据数据分析得出结论"></textarea>
+                        </div>
+                        <div class="mt-3">
+                            <label class="block text-sm font-medium text-gray-600 mb-1">实验总结与反思</label>
+                            <textarea class="form-input h-20 resize-none" id="seedReflection" placeholder="实验过程中的收获与改进方向"></textarea>
+                        </div>
+                    </div>
+
+                    <!-- 步骤4 -->
+                    <div>
+                        <div class="flex items-center mb-3">
+                            <div class="step-number teal">4</div>
+                            <h4 class="font-semibold text-lg text-gray-800">成果海报</h4>
+                        </div>
+                        <div class="upload-box" onclick="document.getElementById('seedPoster').click()">
+                            <i class="fa fa-file-image-o text-2xl mb-2"></i>
+                            <p>点击上传成果海报</p>
+                            <input type="file" id="seedPoster" accept="image/*,.pdf" onchange="previewFile(this, 'seedPosterPreview')">
+                        </div>
+                        <div id="seedPosterPreview"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 任务三：气温降水 -->
+        <section class="step-card mb-6">
+            <div class="section-header orange flex items-center justify-between">
+                <span><i class="fa fa-thermometer-half mr-2"></i> 任务三：城市气温与降水的比较</span>
+                <button class="text-white/80 hover:text-white no-print" onclick="toggleCollapse('task3')">
+                    <i class="fa fa-chevron-down" id="task3-icon"></i>
+                </button>
+            </div>
+            <div class="collapse-content open" id="task3">
+                <div class="p-5 space-y-6">
+                    <!-- 步骤1 -->
+                    <div>
+                        <div class="flex items-center mb-3">
+                            <div class="step-number orange">1</div>
+                            <h4 class="font-semibold text-lg text-gray-800">提出研究问题</h4>
+                        </div>
+                        <div class="tip-box orange">
+                            <i class="fa fa-lightbulb-o mr-1"></i>
+                            选题参考：横向对比（多城市同年）、纵向对比（同城市多年）、季节对比
+                        </div>
+                        <div class="grid md:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-600 mb-1">研究主题</label>
+                                <input type="text" class="form-input" id="climateTopic" placeholder="例：北京与上海气温降水差异">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-600 mb-1">研究问题</label>
+                                <input type="text" class="form-input" id="climateQuestion" placeholder="例：两城市气温和降水变化有何异同？">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 步骤2 -->
+                    <div>
+                        <div class="flex items-center mb-3">
+                            <div class="step-number orange">2</div>
+                            <h4 class="font-semibold text-lg text-gray-800">气温与降水数据</h4>
+                        </div>
+                        <div class="flex justify-end mb-2 no-print">
+                            <button class="btn btn-orange btn-sm" onclick="addRow('climateDataTable')">
+                                <i class="fa fa-plus mr-1"></i> 添加月份数据
+                            </button>
+                        </div>
+                        <table class="data-table" id="climateDataTable">
+                            <thead><tr><th>序号</th><th>月份</th><th>城市</th><th>平均气温(℃)</th><th>降水量(mm)</th><th class="no-print">操作</th></tr></thead>
+                            <tbody>
+                                <tr>
+                                    <td>1</td>
+                                    <td><input type="number" class="form-input form-input-sm placeholder-gray" placeholder="1"></td>
+                                    <td><input type="text" class="form-input form-input-sm placeholder-gray" placeholder="北京"></td>
+                                    <td><input type="number" class="form-input form-input-sm placeholder-gray" placeholder="-2"></td>
+                                    <td><input type="number" class="form-input form-input-sm placeholder-gray" placeholder="5"></td>
+                                    <td class="no-print"><button class="btn btn-danger btn-sm" onclick="deleteRow(this)">删除</button></td>
+                                </tr>
+                                <tr>
+                                    <td>2</td>
+                                    <td><input type="number" class="form-input form-input-sm placeholder-gray" placeholder="7"></td>
+                                    <td><input type="text" class="form-input form-input-sm placeholder-gray" placeholder="北京"></td>
+                                    <td><input type="number" class="form-input form-input-sm placeholder-gray" placeholder="26"></td>
+                                    <td><input type="number" class="form-input form-input-sm placeholder-gray" placeholder="185"></td>
+                                    <td class="no-print"><button class="btn btn-danger btn-sm" onclick="deleteRow(this)">删除</button></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- 步骤3 -->
+                    <div>
+                        <div class="flex items-center mb-3">
+                            <div class="step-number orange">3</div>
+                            <h4 class="font-semibold text-lg text-gray-800">图表生成与数据分析</h4>
+                        </div>
+                        <div class="grid md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-600 mb-1">选用的图表类型</label>
+                                <select class="form-input" id="climateChartType">
+                                    <option value="line">折线图</option>
+                                    <option value="bar">条形图</option>
+                                    <option value="combo">复合图</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-600 mb-1">数据反映的规律</label>
+                                <input type="text" class="form-input" id="climatePattern" placeholder="如：北京夏季高温多雨">
+                            </div>
+                        </div>
+                        <div class="chart-container" id="climateChartContainer">
+                            <canvas id="climateChartCanvas"></canvas>
+                        </div>
+                        <button class="btn btn-orange btn-sm no-print" onclick="generateClimateChart()">
+                            <i class="fa fa-line-chart mr-1"></i> 生成图表
+                        </button>
+                        <div class="mt-3">
+                            <label class="block text-sm font-medium text-gray-600 mb-1">分析结论</label>
+                            <textarea class="form-input h-20 resize-none" id="climateConclusion" placeholder="根据图表分析得出结论"></textarea>
+                        </div>
+                        <div class="mt-3">
+                            <label class="block text-sm font-medium text-gray-600 mb-1">总结与反思</label>
+                            <textarea class="form-input h-20 resize-none" id="climateReflection" placeholder="研究过程中的收获与体会"></textarea>
+                        </div>
+                    </div>
+
+                    <!-- 步骤4 -->
+                    <div>
+                        <div class="flex items-center mb-3">
+                            <div class="step-number orange">4</div>
+                            <h4 class="font-semibold text-lg text-gray-800">成果海报</h4>
+                        </div>
+                        <div class="upload-box" onclick="document.getElementById('climatePoster').click()">
+                            <i class="fa fa-file-image-o text-2xl mb-2"></i>
+                            <p>点击上传成果海报</p>
+                            <input type="file" id="climatePoster" accept="image/*,.pdf" onchange="previewFile(this, 'climatePosterPreview')">
+                        </div>
+                        <div id="climatePosterPreview"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 自我评价 -->
+        <section class="step-card mb-6">
+            <div class="section-header flex items-center" style="background: linear-gradient(90deg, #7C3AED 0%, #8B5CF6 100%);">
+                <i class="fa fa-star mr-2"></i> 自我评价
+            </div>
+            <div class="p-5 overflow-x-auto">
+                <table class="data-table" style="min-width:700px;">
+                    <thead>
+                        <tr>
+                            <th style="width:16%;">评价维度</th>
+                            <th style="width:16%;">优秀(A)</th>
+                            <th style="width:16%;">良好(B)</th>
+                            <th style="width:16%;">合格(C)</th>
+                            <th style="width:16%;">不合格(D)</th>
+                            <th style="width:20%;">自我评分</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="text-left font-medium text-sm">数据采集与整理</td>
+                            <td class="text-xs text-left">数据完整规范，来源可靠</td>
+                            <td class="text-xs text-left">数据基本完整</td>
+                            <td class="text-xs text-left">数据有部分缺失</td>
+                            <td class="text-xs text-left">数据严重缺失或混乱</td>
+                            <td class="radio-score">
+                                <label><input type="radio" name="e1" value="A" onchange="calcScore()"> A</label>
+                                <label><input type="radio" name="e1" value="B" onchange="calcScore()"> B</label>
+                                <label><input type="radio" name="e1" value="C" onchange="calcScore()"> C</label>
+                                <label><input type="radio" name="e1" value="D" onchange="calcScore()"> D</label>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="text-left font-medium text-sm">图表选择与绘制</td>
+                            <td class="text-xs text-left">图表类型恰当，美观清晰</td>
+                            <td class="text-xs text-left">图表基本合理</td>
+                            <td class="text-xs text-left">图表有部分问题</td>
+                            <td class="text-xs text-left">图表选择不当或绘制错误</td>
+                            <td class="radio-score">
+                                <label><input type="radio" name="e2" value="A" onchange="calcScore()"> A</label>
+                                <label><input type="radio" name="e2" value="B" onchange="calcScore()"> B</label>
+                                <label><input type="radio" name="e2" value="C" onchange="calcScore()"> C</label>
+                                <label><input type="radio" name="e2" value="D" onchange="calcScore()"> D</label>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="text-left font-medium text-sm">数据分析与结论</td>
+                            <td class="text-xs text-left">分析深入，结论有据</td>
+                            <td class="text-xs text-left">分析基本正确</td>
+                            <td class="text-xs text-left">分析较浅，结论模糊</td>
+                            <td class="text-xs text-left">分析错误或无结论</td>
+                            <td class="radio-score">
+                                <label><input type="radio" name="e3" value="A" onchange="calcScore()"> A</label>
+                                <label><input type="radio" name="e3" value="B" onchange="calcScore()"> B</label>
+                                <label><input type="radio" name="e3" value="C" onchange="calcScore()"> C</label>
+                                <label><input type="radio" name="e3" value="D" onchange="calcScore()"> D</label>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="text-left font-medium text-sm">跨学科融合</td>
+                            <td class="text-xs text-left">自然融合多学科知识</td>
+                            <td class="text-xs text-left">能结合基础跨学科内容</td>
+                            <td class="text-xs text-left">跨学科结合较生硬</td>
+                            <td class="text-xs text-left">无跨学科意识</td>
+                            <td class="radio-score">
+                                <label><input type="radio" name="e4" value="A" onchange="calcScore()"> A</label>
+                                <label><input type="radio" name="e4" value="B" onchange="calcScore()"> B</label>
+                                <label><input type="radio" name="e4" value="C" onchange="calcScore()"> C</label>
+                                <label><input type="radio" name="e4" value="D" onchange="calcScore()"> D</label>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="text-left font-medium text-sm">团队协作与成果</td>
+                            <td class="text-xs text-left">分工明确，成果完整</td>
+                            <td class="text-xs text-left">基本配合，成果完整</td>
+                            <td class="text-xs text-left">配合一般，成果有缺漏</td>
+                            <td class="text-xs text-left">分工模糊，成果单薄</td>
+                            <td class="radio-score">
+                                <label><input type="radio" name="e5" value="A" onchange="calcScore()"> A</label>
+                                <label><input type="radio" name="e5" value="B" onchange="calcScore()"> B</label>
+                                <label><input type="radio" name="e5" value="C" onchange="calcScore()"> C</label>
+                                <label><input type="radio" name="e5" value="D" onchange="calcScore()"> D</label>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="mt-3 p-3 bg-gray-50 rounded-lg flex items-center justify-between">
+                    <span class="font-medium text-gray-700">综合评价等级：</span>
+                    <span id="totalScore" class="text-xl font-bold text-primary">请选择评分</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- 总结与反思 -->
+        <section class="step-card mb-6">
+            <div class="section-header flex items-center" style="background: linear-gradient(90deg, #4F46E5 0%, #7C3AED 100%);">
+                <i class="fa fa-book mr-2"></i> 总结与反思
+            </div>
+            <div class="p-5 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-600 mb-1">本次项目的收获</label>
+                    <textarea class="form-input h-24 resize-none" id="harvest" placeholder="从知识、能力、协作等方面谈谈你的收获"></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-600 mb-1">遇到的困难及改进思路</label>
+                    <textarea class="form-input h-24 resize-none" id="improve" placeholder="记录遇到的问题，以及下次可以如何改进"></textarea>
+                </div>
+            </div>
+        </section>
+
+        <footer class="text-center text-gray-400 text-sm py-4">
+            数据可视化 · 项目学习任务单
+        </footer>
+    </div>
+
+    <script>
+        // ========== 日历 ==========
+        let selectedDate = null;
+        let currentViewDate = new Date();
+        const dateDisplayText = document.getElementById('dateDisplayText');
+        const calendarPopup = document.getElementById('calendarPopup');
+        const daysGrid = document.getElementById('daysGrid');
+        const calMonthYear = document.getElementById('calMonthYear');
+
+        function toggleCalendar() {
+            const isOpen = calendarPopup.classList.contains('open');
+            if (isOpen) { calendarPopup.classList.remove('open'); } else { renderCalendar();
+                calendarPopup.classList.add('open'); }
+        }
+        document.addEventListener('click', function(e) {
+            const wrapper = document.getElementById('datePickerWrapper');
+            if (!wrapper.contains(e.target)) { calendarPopup.classList.remove('open'); }
+        });
+
+        function renderCalendar() {
+            const year = currentViewDate.getFullYear();
+            const month = currentViewDate.getMonth();
+            calMonthYear.textContent = `${year}年 ${month+1}月`;
+            const firstDay = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const daysInPrevMonth = new Date(year, month, 0).getDate();
+            let html = '';
+            for (let i = firstDay - 1; i >= 0; i--) {
+                const d = daysInPrevMonth - i;
+                html +=
+                    `<button class="day-cell other-month" data-year="${year}" data-month="${month-1}" data-day="${d}">${d}</button>`;
+            }
+            const today = new Date();
+            for (let d = 1; d <= daysInMonth; d++) {
+                const isToday = (d === today.getDate() && month === today.getMonth() && year === today.getFullYear());
+                const isSelected = (selectedDate && d === selectedDate.getDate() && month === selectedDate.getMonth() &&
+                    year === selectedDate.getFullYear());
+                let cls = 'day-cell';
+                if (isToday) cls += ' today';
+                if (isSelected) cls += ' selected';
+                html +=
+                    `<button class="${cls}" data-year="${year}" data-month="${month}" data-day="${d}">${d}</button>`;
+            }
+            const totalCells = firstDay + daysInMonth;
+            const remain = (7 - totalCells % 7) % 7;
+            for (let d = 1; d <= remain; d++) {
+                html +=
+                    `<button class="day-cell other-month" data-year="${year}" data-month="${month+1}" data-day="${d}">${d}</button>`;
+            }
+            daysGrid.innerHTML = html;
+            daysGrid.querySelectorAll('.day-cell').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const y = parseInt(this.dataset.year);
+                    const m = parseInt(this.dataset.month);
+                    const d = parseInt(this.dataset.day);
+                    const date = new Date(y, m, d);
+                    if (m !== currentViewDate.getMonth() || y !== currentViewDate.getFullYear()) {
+                        currentViewDate = new Date(y, m, 1);
+                        renderCalendar();
+                    }
+                    selectDate(date);
+                });
+            });
+        }
+
+        function selectDate(date) {
+            selectedDate = new Date(date);
+            const y = selectedDate.getFullYear();
+            const m = String(selectedDate.getMonth() + 1).padStart(2, '0');
+            const d = String(selectedDate.getDate()).padStart(2, '0');
+            dateDisplayText.textContent = `${y} / ${m} / ${d}`;
+            dateDisplayText.classList.remove('placeholder');
+            calendarPopup.classList.remove('open');
+            renderCalendar();
+        }
+
+        function changeMonth(delta) { currentViewDate.setMonth(currentViewDate.getMonth() + delta);
+            renderCalendar(); }
+
+        function selectToday() {
+            const today = new Date();
+            currentViewDate = new Date(today.getFullYear(), today.getMonth(), 1);
+            renderCalendar();
+            selectDate(today);
+        }
+
+        function clearDate() {
+            selectedDate = null;
+            dateDisplayText.textContent = '年 / 月 / 日';
+            dateDisplayText.classList.add('placeholder');
+            calendarPopup.classList.remove('open');
+            renderCalendar();
+        }
+        renderCalendar();
+
+        // ========== 核心：添加行（修复版） ==========
+        function addRow(tableId) {
+            const table = document.getElementById(tableId);
+            const tbody = table.getElementsByTagName('tbody')[0];
+
+            // 团队分工表（无序号列）
+            if (tableId === 'teamTable') {
+                const row = tbody.insertRow();
+                const cell1 = row.insertCell(0);
+                const inp1 = document.createElement('input');
+                inp1.type = 'text';
+                inp1.className = 'form-input';
+                inp1.placeholder = '成员姓名';
+                cell1.appendChild(inp1);
+
+                const cell2 = row.insertCell(1);
+                const inp2 = document.createElement('input');
+                inp2.type = 'text';
+                inp2.className = 'form-input';
+                inp2.placeholder = '如：数据采集、图表绘制、海报制作';
+                cell2.appendChild(inp2);
+
+                const cell3 = row.insertCell(2);
+                cell3.innerHTML = '<button class="btn btn-danger btn-sm no-print" onclick="deleteRow(this)">删除</button>';
+                cell3.classList.add('no-print');
+                return;
+            }
+
+            // 其他表格（有序号列）
+            const colCount = table.rows[0].cells.length;
+            const row = tbody.insertRow();
+            for (let i = 0; i < colCount; i++) {
+                const cell = row.insertCell(i);
+                // 序号列
+                if (i === 0) {
+                    cell.textContent = tbody.rows.length;
+                    continue;
+                }
+                // 操作列（最后一列）
+                if (i === colCount - 1) {
+                    cell.innerHTML = '<button class="btn btn-danger btn-sm no-print" onclick="deleteRow(this)">删除</button>';
+                    cell.classList.add('no-print');
+                    continue;
+                }
+                // 数据列
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.className = 'form-input form-input-sm placeholder-gray';
+
+                if (tableId === 'scoreDataTable') {
+                    if (i === 1) { input.placeholder = '班级'; } 
+                    else if (i === 2) { input.placeholder = '学科'; } 
+                    else if (i === 3) { 
+                        input.type = 'number';
+                        input.placeholder = '成绩';
+                        input.classList.add('score-val');   // 关键：添加类以便统计
+                    }
+                } else if (tableId === 'seedDataTable') {
+                    if (i === 1) { input.type = 'number'; input.placeholder = '天数'; } 
+                    else if (i === 2) { input.placeholder = '种子类型'; } 
+                    else if (i === 3) { input.type = 'number'; input.placeholder = '发芽数'; } 
+                    else if (i === 4) { input.type = 'number'; input.placeholder = '高度'; }
+                } else if (tableId === 'climateDataTable') {
+                    if (i === 1) { input.type = 'number'; input.placeholder = '月份'; } 
+                    else if (i === 2) { input.placeholder = '城市'; } 
+                    else if (i === 3) { input.type = 'number'; input.placeholder = '气温'; } 
+                    else if (i === 4) { input.type = 'number'; input.placeholder = '降水'; }
+                }
+
+                if (input.placeholder) {
+                    input.setAttribute('data-ph', input.placeholder);
+                }
+                cell.appendChild(input);
+
+                // 输入事件：清除占位样式
+                input.addEventListener('input', function() {
+                    if (this.value.trim() !== '') {
+                        this.classList.remove('placeholder-gray');
+                        this.placeholder = '';
+                    } else {
+                        this.classList.add('placeholder-gray');
+                        const ph = this.getAttribute('data-ph');
+                        if (ph) this.placeholder = ph;
+                    }
+                });
+                if (input.value.trim() !== '') {
+                    input.classList.remove('placeholder-gray');
+                    input.placeholder = '';
+                }
+            }
+        }
+
+        function deleteRow(btn) {
+            const row = btn.closest('tr');
+            const tbody = row.parentElement;
+            if (tbody.rows.length <= 1) {
+                alert('至少保留一行');
+                return;
+            }
+            row.remove();
+            const tableId = tbody.parentElement.id;
+            if (tableId === 'scoreDataTable' || tableId === 'seedDataTable' || tableId === 'climateDataTable') {
+                Array.from(tbody.rows).forEach((r, idx) => {
+                    r.cells[0].textContent = idx + 1;
+                });
+            }
+        }
+
+        function toggleCollapse(id) {
+            const content = document.getElementById(id);
+            const icon = document.getElementById(id + '-icon');
+            content.classList.toggle('open');
+            icon.classList.toggle('fa-chevron-up');
+            icon.classList.toggle('fa-chevron-down');
+        }
+
+        function previewFile(input, previewId) {
+            const preview = document.getElementById(previewId);
+            preview.innerHTML = '';
+            const file = input.files[0];
+            if (!file) return;
+            if (file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    const img = document.createElement('img');
+                    img.src = e.target.result;
+                    img.className = 'preview-img';
+                    preview.appendChild(img);
+                };
+                reader.readAsDataURL(file);
+            } else {
+                const p = document.createElement('p');
+                p.className = 'text-sm text-gray-600 mt-2';
+                p.innerHTML = `<i class="fa fa-file-o mr-1"></i> 已选择文件：${file.name}`;
+                preview.appendChild(p);
+            }
+        }
+
+        // ========== 统计量计算（修复版） ==========
+        function calcScoreStats() {
+            // 获取所有成绩输入框（包括动态添加的）
+            const inputs = document.querySelectorAll('#scoreDataTable .score-val');
+            const scores = [];
+            inputs.forEach(inp => {
+                const val = inp.value.trim();
+                if (val !== '') {
+                    const num = parseFloat(val);
+                    if (!isNaN(num)) scores.push(num);
+                }
+            });
+            if (scores.length === 0) {
+                alert('请录入有效的成绩数据');
+                return;
+            }
+            scores.sort((a, b) => a - b);
+            const n = scores.length;
+            const sum = scores.reduce((a, b) => a + b, 0);
+            const mean = sum / n;
+            const median = n % 2 === 0 ? (scores[n / 2 - 1] + scores[n / 2]) / 2 : scores[Math.floor(n / 2)];
+            const variance = scores.reduce((a, b) => a + (b - mean) ** 2, 0) / n;   // 总体方差
+            const max = Math.max(...scores);
+            const min = Math.min(...scores);
+            document.getElementById('scoreMean').value = mean.toFixed(1);
+            document.getElementById('scoreMedian').value = median.toFixed(1);
+            document.getElementById('scoreVariance').value = variance.toFixed(1);
+            document.getElementById('scoreMax').value = max;
+            document.getElementById('scoreMin').value = min;
+        }
+
+        // ================================================================
+        // Chart.js 图表生成器（全面修复）
+        // ================================================================
+        let scoreChartInstance = null;
+        let seedChartInstance = null;
+        let climateChartInstance = null;
+
+        // 通用数据读取：提取指定列（输入框索引）的数据
+        function getTableData(tableId, colIndices) {
+            const tbody = document.querySelector(`#${tableId} tbody`);
+            if (!tbody) return [];
+            const rows = tbody.querySelectorAll('tr');
+            const result = [];
+            rows.forEach(row => {
+                const inputs = row.querySelectorAll('input');
+                if (inputs.length === 0) return;
+                const rowData = [];
+                let hasValue = false;
+                colIndices.forEach(idx => {
+                    if (idx < inputs.length) {
+                        const val = inputs[idx].value.trim();
+                        rowData.push(val);
+                        if (val !== '') hasValue = true;
+                    } else {
+                        rowData.push('');
+                    }
+                });
+                if (hasValue) {
+                    result.push(rowData);
+                }
+            });
+            return result;
+        }
+
+        // ---- 任务一：成绩图表 ----
+        function generateScoreChart() {
+            const canvas = document.getElementById('scoreChartCanvas');
+            const ctx = canvas.getContext('2d');
+            if (scoreChartInstance) { 
+                scoreChartInstance.destroy();
+                scoreChartInstance = null;
+            }
+
+            // 读取成绩数据（输入框索引：班级0，学科1，成绩2）
+            const data = getTableData('scoreDataTable', [2]);
+            if (data.length === 0) {
+                alert('请先录入成绩数据（至少一行有效数据）');
+                return;
+            }
+            const scores = data.map(row => parseFloat(row[0])).filter(v => !isNaN(v));
+            if (scores.length === 0) {
+                alert('请录入有效的成绩数据（数字）');
+                return;
+            }
+
+            const type = document.getElementById('scoreChartType').value;
+            let chartConfig = null;
+            try {
+                if (type === 'box') {
+                    // 检查 boxplot 插件是否可用
+                    if (typeof Chart !== 'undefined' && Chart.controllers && Chart.controllers.boxplot) {
+                        chartConfig = {
+                            type: 'boxplot',
+                            data: {
+                                datasets: [{
+                                    label: '成绩分布',
+                                    data: scores,
+                                    backgroundColor: 'rgba(79, 70, 229, 0.6)',
+                                    borderColor: '#4F46E5',
+                                    borderWidth: 2,
+                                    outlierColor: '#EF4444',
+                                    outlierRadius: 4,
+                                    itemRadius: 0
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: true,
+                                plugins: {
+                                    title: { display: true, text: '箱线图' },
+                                    legend: { display: false }
+                                },
+                                scales: {
+                                    y: {
+                                        beginAtZero: true,
+                                        title: { display: true, text: '成绩' }
+                                    }
+                                }
+                            }
+                        };
+                    } else {
+                        // 备用方案：用条形图展示五数概括
+                        const sorted = [...scores].sort((a, b) => a - b);
+                        const q1 = sorted[Math.floor(sorted.length * 0.25)];
+                        const q2 = sorted[Math.floor(sorted.length * 0.5)];
+                        const q3 = sorted[Math.floor(sorted.length * 0.75)];
+                        const minVal = sorted[0];
+                        const maxVal = sorted[sorted.length - 1];
+                        chartConfig = {
+                            type: 'bar',
+                            data: {
+                                labels: ['最小值', 'Q1', '中位数', 'Q3', '最大值'],
+                                datasets: [{
+                                    label: '成绩分布（五数概括）',
+                                    data: [minVal, q1, q2, q3, maxVal],
+                                    backgroundColor: ['#93C5FD', '#60A5FA', '#3B82F6', '#2563EB', '#1D4ED8'],
+                                    borderRadius: 4
+                                }]
+                            },
+                            options: {
+                                plugins: { title: { display: true, text: '箱线图（五数概括）' } },
+                                scales: { y: { beginAtZero: true } },
+                                responsive: true,
+                                maintainAspectRatio: true
+                            }
+                        };
+                    }
+                } else if (type === 'histogram') {
+                    const bins = Math.min(5, Math.max(3, Math.ceil(scores.length / 2)));
+                    const minVal = Math.min(...scores);
+                    const maxVal = Math.max(...scores);
+                    const range = maxVal - minVal || 1;
+                    const step = range / bins;
+                    const histData = Array(bins).fill(0);
+                    const histLabels = [];
+                    for (let i = 0; i < bins; i++) {
+                        const lower = minVal + i * step;
+                        const upper = minVal + (i + 1) * step;
+                        histLabels.push(`${lower.toFixed(0)}-${upper.toFixed(0)}`);
+                        scores.forEach(v => {
+                            if (v >= lower && v < upper) histData[i]++;
+                        });
+                    }
+                    chartConfig = {
+                        type: 'bar',
+                        data: {
+                            labels: histLabels,
+                            datasets: [{
+                                label: '频数',
+                                data: histData,
+                                backgroundColor: 'rgba(79,70,229,0.6)',
+                                borderColor: '#4F46E5',
+                                borderWidth: 1
+                            }]
+                        },
+                        options: {
+                            plugins: { title: { display: true, text: '直方图' } },
+                            responsive: true,
+                            maintainAspectRatio: true
+                        }
+                    };
+                } else if (type === 'line') {
+                    const labels = data.map((_, i) => (i + 1).toString());
+                    chartConfig = {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: '成绩趋势',
+                                data: scores,
+                                borderColor: '#4F46E5',
+                                backgroundColor: 'rgba(79,70,229,0.1)',
+                                fill: true,
+                                tension: 0.3,
+                                pointRadius: 5
+                            }]
+                        },
+                        options: {
+                            plugins: { title: { display: true, text: '折线图' } },
+                            responsive: true,
+                            maintainAspectRatio: true
+                        }
+                    };
+                } else if (type === 'scatter') {
+                    const scatterData = scores.map((v, i) => ({ x: i + 1, y: v }));
+                    chartConfig = {
+                        type: 'scatter',
+                        data: {
+                            datasets: [{
+                                label: '成绩散点',
+                                data: scatterData,
+                                backgroundColor: '#4F46E5',
+                                pointRadius: 6
+                            }]
+                        },
+                        options: {
+                            plugins: { title: { display: true, text: '散点图' } },
+                            scales: {
+                                x: { type: 'linear', position: 'bottom', title: { display: true, text: '序号' } },
+                                y: { beginAtZero: true }
+                            },
+                            responsive: true,
+                            maintainAspectRatio: true
+                        }
+                    };
+                }
+
+                if (chartConfig) {
+                    scoreChartInstance = new Chart(ctx, chartConfig);
+                }
+            } catch (e) {
+                alert('图表生成失败：' + e.message);
+                console.error(e);
+            }
+        }
+
+        // ---- 任务二：种子图表 ----
+        function generateSeedChart() {
+            const canvas = document.getElementById('seedChartCanvas');
+            const ctx = canvas.getContext('2d');
+            if (seedChartInstance) { seedChartInstance.destroy(); seedChartInstance = null; }
+
+            const data = getTableData('seedDataTable', [0, 2]); // 天数, 发芽数
+            if (data.length === 0) {
+                alert('请先录入种子数据（至少一行有效数据）');
+                return;
+            }
+            const labels = [];
+            const values = [];
+            data.forEach(row => {
+                const day = row[0]?.trim() || '';
+                const val = parseFloat(row[1]);
+                if (day !== '' && !isNaN(val)) {
+                    labels.push(day);
+                    values.push(val);
+                }
+            });
+            if (values.length === 0) {
+                alert('请录入有效的发芽数数据');
+                return;
+            }
+
+            const type = document.getElementById('seedChartType').value;
+            let chartConfig = null;
+            try {
+                if (type === 'bar') {
+                    chartConfig = {
+                        type: 'bar',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: '发芽数',
+                                data: values,
+                                backgroundColor: 'rgba(13,148,136,0.6)',
+                                borderColor: '#0D9488',
+                                borderWidth: 1
+                            }]
+                        },
+                        options: {
+                            plugins: { title: { display: true, text: '发芽数条形图' } },
+                            responsive: true,
+                            maintainAspectRatio: true
+                        }
+                    };
+                } else {
+                    chartConfig = {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: '发芽数变化',
+                                data: values,
+                                borderColor: '#0D9488',
+                                backgroundColor: 'rgba(13,148,136,0.1)',
+                                fill: true,
+                                tension: 0.3,
+                                pointRadius: 5
+                            }]
+                        },
+                        options: {
+                            plugins: { title: { display: true, text: '发芽数折线图' } },
+                            responsive: true,
+                            maintainAspectRatio: true
+                        }
+                    };
+                }
+                if (chartConfig) {
+                    seedChartInstance = new Chart(ctx, chartConfig);
+                }
+            } catch (e) {
+                alert('图表生成失败：' + e.message);
+                console.error(e);
+            }
+        }
+
+        // ---- 任务三：气候图表 ----
+        function generateClimateChart() {
+            const canvas = document.getElementById('climateChartCanvas');
+            const ctx = canvas.getContext('2d');
+            if (climateChartInstance) { climateChartInstance.destroy(); climateChartInstance = null; }
+
+            const data = getTableData('climateDataTable', [0, 2, 3]); // 月份, 气温, 降水
+            if (data.length === 0) {
+                alert('请先录入气候数据（至少一行有效数据）');
+                return;
+            }
+            const labels = [];
+            const temps = [];
+            const rains = [];
+            data.forEach(row => {
+                const month = row[0]?.trim() || '';
+                const temp = parseFloat(row[1]);
+                const rain = parseFloat(row[2]);
+                if (month !== '' && !isNaN(temp) && !isNaN(rain)) {
+                    labels.push(month);
+                    temps.push(temp);
+                    rains.push(rain);
+                }
+            });
+            if (temps.length === 0) {
+                alert('请录入有效的气温与降水数据');
+                return;
+            }
+
+            const type = document.getElementById('climateChartType').value;
+            let chartConfig = null;
+            try {
+                if (type === 'bar') {
+                    chartConfig = {
+                        type: 'bar',
+                        data: {
+                            labels: labels,
+                            datasets: [
+                                { label: '气温(℃)', data: temps, backgroundColor: 'rgba(234,88,12,0.6)',
+                                    borderColor: '#EA580C', borderWidth: 1 },
+                                { label: '降水量(mm)', data: rains, backgroundColor: 'rgba(59,130,246,0.6)',
+                                    borderColor: '#3B82F6', borderWidth: 1 }
+                            ]
+                        },
+                        options: {
+                            plugins: { title: { display: true, text: '气温与降水条形图' } },
+                            responsive: true,
+                            maintainAspectRatio: true
+                        }
+                    };
+                } else if (type === 'combo') {
+                    chartConfig = {
+                        type: 'bar',
+                        data: {
+                            labels: labels,
+                            datasets: [
+                                { label: '气温(℃)', data: temps, backgroundColor: 'rgba(234,88,12,0.5)',
+                                    borderColor: '#EA580C', borderWidth: 1, yAxisID: 'y' },
+                                { label: '降水量(mm)', data: rains, type: 'line', borderColor: '#3B82F6',
+                                    backgroundColor: 'rgba(59,130,246,0.1)', fill: true, tension: 0.3,
+                                    yAxisID: 'y1', pointRadius: 4 }
+                            ]
+                        },
+                        options: {
+                            plugins: { title: { display: true, text: '气温降水复合图' } },
+                            scales: {
+                                y: { position: 'left', beginAtZero: true },
+                                y1: { position: 'right', grid: { drawOnChartArea: false }, beginAtZero: true }
+                            },
+                            responsive: true,
+                            maintainAspectRatio: true
+                        }
+                    };
+                } else {
+                    chartConfig = {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: [
+                                { label: '气温(℃)', data: temps, borderColor: '#EA580C',
+                                    backgroundColor: 'rgba(234,88,12,0.1)', fill: true, tension: 0.3,
+                                    pointRadius: 5 },
+                                { label: '降水量(mm)', data: rains, borderColor: '#3B82F6',
+                                    backgroundColor: 'rgba(59,130,246,0.1)', fill: true, tension: 0.3,
+                                    pointRadius: 5 }
+                            ]
+                        },
+                        options: {
+                            plugins: { title: { display: true, text: '气温与降水折线图' } },
+                            responsive: true,
+                            maintainAspectRatio: true
+                        }
+                    };
+                }
+                if (chartConfig) {
+                    climateChartInstance = new Chart(ctx, chartConfig);
+                }
+            } catch (e) {
+                alert('图表生成失败：' + e.message);
+                console.error(e);
+            }
+        }
+
+        // ========== 自我评价 ==========
+        function calcScore() {
+            const items = ['e1', 'e2', 'e3', 'e4', 'e5'];
+            let total = 0, count = 0;
+            items.forEach(s => {
+                const val = document.querySelector(`input[name="${s}"]:checked`);
+                if (val) {
+                    count++;
+                    const v = val.value;
+                    if (v === 'A') total += 4;
+                    else if (v === 'B') total += 3;
+                    else if (v === 'C') total += 2;
+                    else if (v === 'D') total += 1;
+                }
+            });
+            if (count === 0) { document.getElementById('totalScore').textContent = '请选择评分'; return; }
+            const avg = total / count;
+            let grade = '不合格 (D)';
+            if (avg >= 3.8) grade = '优秀 (A)';
+            else if (avg >= 3.0) grade = '良好 (B)';
+            else if (avg >= 2.0) grade = '合格 (C)';
+            document.getElementById('totalScore').textContent = grade;
+        }
+
+        // ========== 保存 / 加载 / 清空 ==========
+        function saveData() {
+            const data = {};
+            if (selectedDate) {
+                const y = selectedDate.getFullYear();
+                const m = String(selectedDate.getMonth() + 1).padStart(2, '0');
+                const d = String(selectedDate.getDate()).padStart(2, '0');
+                data['selectedDate'] = `${y}-${m}-${d}`;
+            }
+            document.querySelectorAll('input, textarea, select').forEach(el => {
+                if (el.id) data[el.id] = el.value;
+            });
+            document.querySelectorAll('input[type="radio"]:checked').forEach(el => {
+                data[el.name] = el.value;
+            });
+            localStorage.setItem('dataVizProject_final', JSON.stringify(data));
+            alert('进度已保存');
+        }
+
+        function loadData() {
+            const saved = localStorage.getItem('dataVizProject_final');
+            if (!saved) return;
+            const data = JSON.parse(saved);
+            if (data.selectedDate) {
+                const parts = data.selectedDate.split('-');
+                if (parts.length === 3) {
+                    const y = parseInt(parts[0]), m = parseInt(parts[1]) - 1, d = parseInt(parts[2]);
+                    const date = new Date(y, m, d);
+                    if (!isNaN(date.getTime())) selectDate(date);
+                }
+            }
+            Object.keys(data).forEach(key => {
+                if (key === 'selectedDate') return;
+                const el = document.getElementById(key);
+                if (el) el.value = data[key];
+                const radio = document.querySelector(`input[name="${key}"][value="${data[key]}"]`);
+                if (radio) radio.checked = true;
+            });
+            calcScore();
+        }
+
+        function clearAll() {
+            if (confirm('确定清空所有内容？')) {
+                localStorage.removeItem('dataVizProject_final');
+                location.reload();
+            }
+        }
+
+        window.onload = function() {
+            loadData();
+            // 绑定占位符输入事件
+            document.querySelectorAll('.placeholder-gray').forEach(inp => {
+                if (inp.dataset.bound) return;
+                inp.dataset.bound = '1';
+                inp.addEventListener('input', function() {
+                    if (this.value.trim() !== '') {
+                        this.classList.remove('placeholder-gray');
+                        this.placeholder = '';
+                    } else {
+                        this.classList.add('placeholder-gray');
+                        const ph = this.getAttribute('data-ph');
+                        if (ph) this.placeholder = ph;
+                    }
+                });
+                if (inp.placeholder) {
+                    inp.setAttribute('data-ph', inp.placeholder);
+                }
+                if (inp.value.trim() !== '') {
+                    inp.classList.remove('placeholder-gray');
+                    inp.placeholder = '';
+                }
+            });
+        };
+    </script>
+</body>
+</html>

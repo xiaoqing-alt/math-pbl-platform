@@ -1,0 +1,20 @@
+{
+  "name": "math-pbl-platform",
+  "version": "1.0.0",
+  "private": true,
+  "description": "初中数学项目式学习平台（大创原型）",
+  "workspaces": [
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "seed": "node server/src/seed.js",
+    "dev:server": "node --watch server/src/index.js",
+    "dev:client": "npm --workspace client run dev",
+    "build": "npm --workspace client run build",
+    "start": "node server/src/index.js"
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  }
+}

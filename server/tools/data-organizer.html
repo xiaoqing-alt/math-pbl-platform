@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>数据梳理与图表</title>
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    padding:14px 14px 18px;background:#fff;color:#1f2430;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    font-size:14px;line-height:1.6;overflow-x:hidden;
+  }
+  h1{margin:0 0 4px;font-size:16px;font-weight:600;color:#171c28}
+  .sub{margin:0 0 12px;font-size:12px;color:#7b8397;line-height:1.5}
+  .card{margin-bottom:10px;padding:12px;border:1px solid #e7eaf3;border-radius:12px;background:#fff}
+  .card-title{margin-bottom:8px;font-size:13px;font-weight:600;color:#2a3142}
+  label{display:block;margin-bottom:5px;font-size:13px;color:#404859}
+  textarea{
+    display:block;width:100%;height:auto;min-height:80px;padding:8px 10px;border:1px solid #dfe4ef;
+    border-radius:9px;background:#fbfcff;color:#1f2430;font-size:14px;line-height:1.6;
+    font-family:inherit;outline:none;resize:vertical;transition:border-color .15s,box-shadow .15s;
+  }
+  textarea:focus{border-color:#4f6ef7;background:#fff;box-shadow:0 0 0 3px rgba(79,110,247,.12)}
+  .hint{margin:6px 0 0;font-size:12px;color:#8a91a4;line-height:1.5}
+  .warn{margin:8px 0 0;padding:7px 9px;border-radius:8px;background:#fff4e8;color:#a25a12;font-size:12px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .stat{min-width:0;padding:8px 10px;border-radius:10px;background:#f6f8fe}
+  .stat span{display:block;font-size:12px;color:#7b8397}
+  .stat strong{display:block;font-size:15px;font-weight:600;color:#2c3550;word-break:break-word}
+  .stat.wide{grid-column:1 / -1}
+  .chart-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;min-width:0}
+  .chart-row:last-child{margin-bottom:0}
+  .bar-label{flex:none;width:42px;text-align:right;font-size:12px;color:#4a5268;word-break:break-all}
+  .bar-track{flex:1 1 auto;min-width:0;height:14px;border-radius:7px;background:#f0f3fb;overflow:hidden}
+  .bar-fill{height:100%;border-radius:7px;background:linear-gradient(90deg,#4f6ef7,#8fa4ff)}
+  .bar-count{flex:none;width:38px;font-size:12px;color:#7b8397}
+  .preview{
+    margin:0;padding:10px;border-radius:10px;background:#f7f8fc;color:#2d3448;
+    font-family:ui-monospace,SFMono-Regular,Consolas,"Courier New",monospace;
+    font-size:12px;line-height:1.7;white-space:pre-wrap;word-break:break-word;
+    max-height:260px;overflow:auto;
+  }
+  .actions{display:flex;gap:8px;margin-top:2px}
+  .btn{
+    flex:1 1 0;height:38px;border-radius:10px;border:1px solid transparent;font-family:inherit;
+    font-size:13px;font-weight:500;cursor:pointer;transition:background .15s,border-color .15s;
+  }
+  .btn-primary{background:#4f6ef7;color:#fff}
+  .btn-primary:hover{background:#4361e3}
+  .btn-ghost{background:#fff;border-color:#dfe4ef;color:#3c455c}
+  .btn-ghost:hover{border-color:#b9c2d8;background:#fafbff}
+  .status{min-height:18px;margin:8px 0 0;font-size:12px;color:#8a91a4;text-align:center}
+  .status.ok{color:#1f8a5a}
+</style>
+</head>
+<body>
+  <h1>数据梳理与图表</h1>
+  <p class="sub">粘贴一组数据，自动算出统计量并画出次数条形图。</p>
+
+  <div class="card">
+    <label for="dataInput">粘贴你的数据</label>
+    <textarea id="dataInput" spellcheck="false">7.5, 8, 8, 9, 7, 6.5, 8, 9.5, 7, 8</textarea>
+    <p class="hint">支持逗号、空格、顿号分隔，例如：7.5, 8, 8, 9</p>
+    <p id="warn" class="warn" hidden>请先输入至少一个有效数字</p>
+  </div>
+
+  <div class="card">
+    <div class="card-title">统计结果</div>
+    <div class="grid">
+      <div class="stat"><span>样本量 n</span><strong id="statN">—</strong></div>
+      <div class="stat"><span>平均数</span><strong id="statMean">—</strong></div>
+      <div class="stat"><span>中位数</span><strong id="statMedian">—</strong></div>
+      <div class="stat"><span>最小值</span><strong id="statMin">—</strong></div>
+      <div class="stat"><span>最大值</span><strong id="statMax">—</strong></div>
+      <div class="stat wide"><span>众数</span><strong id="statMode">—</strong></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">各数值出现次数（按数值从小到大）</div>
+    <div id="chart"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">结果预览</div>
+    <pre id="preview" class="preview"></pre>
+  </div>
+
+  <div class="actions">
+    <button id="appendBtn" class="btn btn-primary" type="button">写入我的作答</button>
+    <button id="copyBtn" class="btn btn-ghost" type="button">复制结果</button>
+  </div>
+  <p id="status" class="status" role="status"></p>
+
+<script>
+(function () {
+  var inputEl = document.getElementById('dataInput');
+  var chartEl = document.getElementById('chart');
+  var previewEl = document.getElementById('preview');
+  var warnEl = document.getElementById('warn');
+  var statusEl = document.getElementById('status');
+  var statN = document.getElementById('statN');
+  var statMean = document.getElementById('statMean');
+  var statMedian = document.getElementById('statMedian');
+  var statMin = document.getElementById('statMin');
+  var statMax = document.getElementById('statMax');
+  var statMode = document.getElementById('statMode');
+
+  function parseData(text) {
+    var parts = String(text).split(/[,，、;；\s]+/);
+    var out = [];
+    parts.forEach(function (part) {
+      var num = parseFloat(part);
+      if (isFinite(num)) out.push(num);
+    });
+    return out;
+  }
+
+  function fmt(n) {
+    return String(Math.round(n * 100) / 100);
+  }
+
+  function analyze(data) {
+    var sorted = data.slice().sort(function (a, b) { return a - b; });
+    var sum = 0;
+    data.forEach(function (n) { sum += n; });
+    var mean = sum / data.length;
+    var mid = Math.floor(sorted.length / 2);
+    var median = sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+
+    var counts = {};
+    data.forEach(function (n) {
+      var key = fmt(n);
+      counts[key] = (counts[key] || 0) + 1;
+    });
+
+    var keys = Object.keys(counts).map(Number).sort(function (a, b) { return a - b; });
+    var maxCount = 0;
+    keys.forEach(function (k) {
+      if (counts[fmt(k)] > maxCount) maxCount = counts[fmt(k)];
+    });
+    var modeText = '无';
+    if (maxCount > 1) {
+      modeText = keys.filter(function (k) {
+        return counts[fmt(k)] === maxCount;
+      }).map(fmt).join('、');
+    }
+
+    return {
+      n: data.length,
+      mean: mean,
+      median: median,
+      min: sorted[0],
+      max: sorted[sorted.length - 1],
+      sorted: sorted,
+      counts: counts,
+      keys: keys,
+      maxCount: maxCount,
+      modeText: modeText
+    };
+  }
+
+  function buildText(data, s) {
+    if (!data.length) {
+      return '数据梳理结果\n（暂无有效数据，请先输入数字）';
+    }
+    var lines = [
+      '数据梳理结果',
+      '原始数据：' + data.map(fmt).join('、'),
+      '样本量 n=' + s.n + '，平均数 ' + fmt(s.mean) + '，中位数 ' + fmt(s.median),
+      '最小值：' + fmt(s.min) + '　最大值：' + fmt(s.max),
+      '众数：' + s.modeText,
+      '各数值出现次数：'
+    ];
+    s.keys.forEach(function (k) {
+      lines.push(fmt(k) + '：' + s.counts[fmt(k)] + ' 次');
+    });
+    return lines.join('\n');
+  }
+
+  function renderChart(s) {
+    if (!s.n) {
+      chartEl.innerHTML = '<p class="hint" style="margin:0">暂无有效数据</p>';
+      return;
+    }
+    var html = '';
+    s.keys.forEach(function (k) {
+      var count = s.counts[fmt(k)];
+      var width = Math.max(6, Math.round(count / s.maxCount * 100));
+      html += '<div class="chart-row">' +
+        '<span class="bar-label">' + fmt(k) + '</span>' +
+        '<div class="bar-track"><div class="bar-fill" style="width:' + width + '%"></div></div>' +
+        '<span class="bar-count">' + count + ' 次</span>' +
+        '</div>';
+    });
+    chartEl.innerHTML = html;
+  }
+
+  function update() {
+    var data = parseData(inputEl.value);
+    var stats = data.length ? analyze(data) : null;
+
+    if (stats) {
+      statN.textContent = String(stats.n);
+      statMean.textContent = fmt(stats.mean);
+      statMedian.textContent = fmt(stats.median);
+      statMin.textContent = fmt(stats.min);
+      statMax.textContent = fmt(stats.max);
+      statMode.textContent = stats.modeText;
+    } else {
+      statN.textContent = '—';
+      statMean.textContent = '—';
+      statMedian.textContent = '—';
+      statMin.textContent = '—';
+      statMax.textContent = '—';
+      statMode.textContent = '—';
+    }
+
+    warnEl.hidden = data.length > 0;
+    renderChart(stats || { n: 0, keys: [], counts: {}, maxCount: 1 });
+    previewEl.textContent = buildText(data, stats);
+  }
+
+  function setStatus(msg, ok) {
+    statusEl.textContent = msg;
+    statusEl.className = 'status' + (ok ? ' ok' : '');
+  }
+
+  inputEl.addEventListener('input', update);
+
+  document.getElementById('appendBtn').addEventListener('click', function () {
+    try {
+      var data = parseData(inputEl.value);
+      var text = buildText(data, data.length ? analyze(data) : null);
+      window.parent.postMessage({ type: 'pbl-append', text: text }, '*');
+      setStatus('已写入，请回到作答区查看', true);
+    } catch (err) {
+      setStatus('写入失败，请改用复制结果', false);
+    }
+  });
+
+  document.getElementById('copyBtn').addEventListener('click', function () {
+    var data = parseData(inputEl.value);
+    var text = buildText(data, data.length ? analyze(data) : null);
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () {
+        setStatus('已复制，可直接粘贴', true);
+      }).catch(function () {
+        setStatus('复制失败，请手动选中复制', false);
+      });
+    } else {
+      setStatus('当前环境无法自动复制，请手动选中复制', false);
+    }
+  });
+
+  update();
+})();
+</script>
+</body>
+</html>

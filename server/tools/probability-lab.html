@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>概率模拟实验</title>
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    padding:14px 14px 18px;background:#fff;color:#1f2430;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    font-size:14px;line-height:1.6;overflow-x:hidden;
+  }
+  h1{margin:0 0 4px;font-size:16px;font-weight:600;color:#171c28}
+  .sub{margin:0 0 12px;font-size:12px;color:#7b8397;line-height:1.5}
+  .card{margin-bottom:10px;padding:12px;border:1px solid #e7eaf3;border-radius:12px;background:#fff}
+  .card-title{margin-bottom:8px;font-size:13px;font-weight:600;color:#2a3142}
+  .seg{display:flex;padding:3px;border-radius:9px;background:#f2f5fc}
+  .segbtn{
+    flex:1 1 0;border:0;background:transparent;color:#5a6478;font-family:inherit;font-size:12.5px;
+    padding:7px 8px;border-radius:7px;cursor:pointer;white-space:nowrap;transition:background .15s,color .15s;
+  }
+  .segbtn.active{background:#4f6ef7;color:#fff}
+  .trials{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+  .btn{
+    height:38px;border-radius:10px;border:1px solid transparent;font-family:inherit;
+    font-size:13px;font-weight:500;cursor:pointer;transition:background .15s,border-color .15s,opacity .15s;
+  }
+  .btn-primary{background:#4f6ef7;color:#fff}
+  .btn-primary:hover{background:#4361e3}
+  .btn-ghost{background:#fff;border-color:#dfe4ef;color:#3c455c}
+  .btn-ghost:hover{border-color:#b9c2d8;background:#fafbff}
+  .btn:disabled{opacity:.5;cursor:default}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .stat{min-width:0;padding:8px 10px;border-radius:10px;background:#f6f8fe}
+  .stat span{display:block;font-size:12px;color:#7b8397}
+  .stat strong{display:block;font-size:15px;font-weight:600;color:#2c3550;word-break:break-all}
+  .bar-row{display:flex;align-items:center;gap:6px;margin-bottom:7px;min-width:0}
+  .bar-row:last-child{margin-bottom:0}
+  .cat{flex:none;width:30px;font-size:12px;color:#4a5268;white-space:nowrap}
+  .track{
+    position:relative;flex:1 1 auto;min-width:0;height:14px;border-radius:7px;
+    background:#f0f3fb;overflow:visible;
+  }
+  .fill{
+    height:100%;border-radius:7px;background:linear-gradient(90deg,#4f6ef7,#8fa4ff);
+    width:0%;transition:width .25s ease;
+  }
+  .theory{
+    position:absolute;top:-3px;bottom:-3px;width:0;border-left:2px dashed #f0a35e;pointer-events:none;
+  }
+  .num{
+    flex:none;width:96px;display:flex;flex-direction:column;line-height:1.25;font-style:normal;
+  }
+  .num b{font-size:12px;font-weight:600;color:#2c3550}
+  .num i{font-size:9.5px;color:#8a91a4;font-style:normal;white-space:nowrap}
+  .legend-note{margin:9px 0 0;font-size:12px;color:#8a91a4;line-height:1.5}
+  .legend-note em{font-style:normal;color:#c47a2c}
+  .tip{margin:0 0 10px;font-size:12px;color:#8a91a4;line-height:1.5}
+  .actions{display:flex;gap:8px;margin-top:2px}
+  .actions .btn{flex:1 1 0}
+  .status{min-height:18px;margin:8px 0 0;font-size:12px;color:#8a91a4;text-align:center}
+  .status.ok{color:#1f8a5a}
+</style>
+</head>
+<body>
+  <h1>概率模拟实验</h1>
+  <p class="sub">反复投掷，观察频率会不会稳定在理论概率附近。</p>
+
+  <div class="card">
+    <div class="card-title">实验类型</div>
+    <div class="seg" id="typeSeg">
+      <button class="segbtn active" type="button" data-type="coin">抛硬币</button>
+      <button class="segbtn" type="button" data-type="dice">掷骰子</button>
+    </div>
+    <div class="trials">
+      <button class="btn btn-ghost trial-btn" type="button" data-n="1">投 1 次</button>
+      <button class="btn btn-ghost trial-btn" type="button" data-n="10">投 10 次</button>
+      <button class="btn btn-ghost trial-btn" type="button" data-n="100">投 100 次</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="grid">
+      <div class="stat"><span>试验总次数</span><strong id="totalVal">0</strong></div>
+      <div class="stat"><span>当前实验</span><strong id="typeName">抛硬币</strong></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">频率条形图</div>
+    <div id="bars"></div>
+    <p class="legend-note" id="theoryNote"></p>
+  </div>
+
+  <p class="tip">提示：次数较少时频率波动大，增加试验次数后，观察频率是否稳定在理论概率附近。</p>
+
+  <div class="actions">
+    <button id="appendBtn" class="btn btn-primary" type="button">写入我的作答</button>
+    <button id="resetBtn" class="btn btn-ghost" type="button">重置</button>
+  </div>
+  <p id="status" class="status" role="status"></p>
+
+<script>
+(function () {
+  'use strict';
+
+  var CONFIG = {
+    coin: {
+      name: '抛硬币',
+      cats: ['正面', '反面'],
+      theory: 0.5
+    },
+    dice: {
+      name: '掷骰子',
+      cats: ['1点', '2点', '3点', '4点', '5点', '6点'],
+      theory: 1 / 6
+    }
+  };
+
+  var state = {
+    type: 'coin',
+    counts: [0, 0],
+    total: 0,
+    animating: false,
+    timer: null
+  };
+
+  var barsEl = document.getElementById('bars');
+  var totalVal = document.getElementById('totalVal');
+  var typeNameEl = document.getElementById('typeName');
+  var theoryNote = document.getElementById('theoryNote');
+  var statusEl = document.getElementById('status');
+  var trialBtns = document.querySelectorAll('.trial-btn');
+
+  function cfg() { return CONFIG[state.type]; }
+
+  function pct(fraction) {
+    return (Math.round(fraction * 1000) / 10).toFixed(1) + '%';
+  }
+
+  function render() {
+    var c = cfg();
+    var n = state.counts.length;
+    var i;
+
+    totalVal.textContent = String(state.total);
+    typeNameEl.textContent = c.name;
+
+    var html = '';
+    for (i = 0; i < n; i++) {
+      var count = state.counts[i];
+      var freq = state.total ? count / state.total : 0;
+      html += '<div class="bar-row">' +
+        '<span class="cat">' + c.cats[i] + '</span>' +
+        '<div class="track">' +
+          '<div class="fill" style="width:' + (freq * 100).toFixed(2) + '%"></div>' +
+          '<span class="theory" style="left:' + (c.theory * 100).toFixed(2) + '%"></span>' +
+        '</div>' +
+        '<span class="num"><b>' + pct(freq) + '</b><i>' + count + ' 次 · 理论 ' + pct(c.theory) + '</i></span>' +
+        '</div>';
+    }
+    barsEl.innerHTML = html;
+
+    theoryNote.innerHTML = '橙色<em>虚线</em>表示理论概率：每类 ' + pct(c.theory) + '。';
+  }
+
+  function setBusy(busy) {
+    state.animating = busy;
+    Array.prototype.forEach.call(trialBtns, function (btn) {
+      btn.disabled = busy;
+    });
+  }
+
+  function runTrials(n) {
+    if (state.animating) return;
+    var c = cfg();
+    setBusy(true);
+    var left = n;
+
+    function chunk() {
+      var take = Math.min(10, left);
+      for (var i = 0; i < take; i++) {
+        state.counts[Math.floor(Math.random() * c.cats.length)] += 1;
+        state.total += 1;
+      }
+      left -= take;
+      render();
+      if (left > 0) {
+        state.timer = setTimeout(chunk, 30);
+      } else {
+        state.timer = null;
+        setBusy(false);
+      }
+    }
+
+    chunk();
+  }
+
+  function resetCounts() {
+    var c = cfg();
+    state.counts = c.cats.map(function () { return 0; });
+    state.total = 0;
+  }
+
+  function resetAll() {
+    if (state.timer) {
+      clearTimeout(state.timer);
+      state.timer = null;
+    }
+    if (state.animating) setBusy(false);
+    state.type = 'coin';
+    resetCounts();
+    var buttons = document.querySelectorAll('#typeSeg .segbtn');
+    Array.prototype.forEach.call(buttons, function (btn) {
+      btn.classList.toggle('active', btn.getAttribute('data-type') === 'coin');
+    });
+    setStatus('');
+    render();
+  }
+
+  function buildRecord() {
+    var c = cfg();
+    var lines = [
+      '概率模拟实验记录',
+      '实验类型：' + c.name,
+      '试验总次数：' + state.total + ' 次'
+    ];
+    var maxDev = 0;
+    c.cats.forEach(function (name, i) {
+      var count = state.counts[i];
+      var freq = state.total ? count / state.total : 0;
+      maxDev = Math.max(maxDev, Math.abs(freq - c.theory));
+      lines.push(name + '：' + count + ' 次，频率 ' + pct(freq) + '，理论概率 ' + pct(c.theory));
+    });
+
+    var observation;
+    if (state.total === 0) {
+      observation = '还没有进行试验，请先投掷若干次。';
+    } else if (state.total < 30) {
+      observation = '试验次数较少，频率波动较大。';
+    } else if (maxDev <= 0.05) {
+      observation = '频率已经比较接近理论概率，增加试验次数会让频率更稳定。';
+    } else {
+      observation = '频率与理论概率仍有偏差，可继续增加试验次数观察变化。';
+    }
+    lines.push('观察：' + observation);
+    return lines.join('\n');
+  }
+
+  function setStatus(msg, ok) {
+    statusEl.textContent = msg;
+    statusEl.className = 'status' + (ok ? ' ok' : '');
+  }
+
+  document.getElementById('typeSeg').addEventListener('click', function (ev) {
+    var btn = ev.target.closest ? ev.target.closest('.segbtn') : null;
+    if (!btn) return;
+    var type = btn.getAttribute('data-type');
+    if (type === state.type) return;
+
+    if (state.timer) {
+      clearTimeout(state.timer);
+      state.timer = null;
+    }
+    if (state.animating) setBusy(false);
+
+    state.type = type;
+    resetCounts();
+    Array.prototype.forEach.call(document.querySelectorAll('#typeSeg .segbtn'), function (b) {
+      b.classList.toggle('active', b === btn);
+    });
+    setStatus('');
+    render();
+  });
+
+  Array.prototype.forEach.call(trialBtns, function (btn) {
+    btn.addEventListener('click', function () {
+      runTrials(parseInt(btn.getAttribute('data-n'), 10));
+      setStatus('');
+    });
+  });
+
+  document.getElementById('appendBtn').addEventListener('click', function () {
+    try {
+      window.parent.postMessage({ type: 'pbl-append', text: buildRecord() }, '*');
+      setStatus('已写入，请回到作答区查看', true);
+    } catch (err) {
+      setStatus('写入失败，请稍后再试', false);
+    }
+  });
+
+  document.getElementById('resetBtn').addEventListener('click', resetAll);
+
+  render();
+})();
+</script>
+</body>
+</html>

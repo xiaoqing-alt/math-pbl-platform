@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>过程检查清单</title>
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    padding:14px 14px 18px;background:#fff;color:#1f2430;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    font-size:14px;line-height:1.6;overflow-x:hidden;
+  }
+  h1{margin:0 0 4px;font-size:16px;font-weight:600;color:#171c28}
+  .sub{margin:0 0 12px;font-size:12px;color:#7b8397;line-height:1.5}
+  .card{margin-bottom:10px;padding:12px;border:1px solid #e7eaf3;border-radius:12px;background:#fff}
+  .card-title{margin-bottom:6px;font-size:13px;font-weight:600;color:#2a3142}
+  .progress-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:13px;color:#404859}
+  .progress-head strong{font-size:14px;color:#4f6ef7}
+  .progress{height:8px;border-radius:4px;background:#eef1f9;overflow:hidden}
+  .progress-bar{height:100%;width:0;border-radius:4px;background:linear-gradient(90deg,#4f6ef7,#8fa4ff);transition:width .2s}
+  .check{
+    display:flex;align-items:flex-start;gap:8px;margin:0;padding:9px 0;border-bottom:1px dashed #eef0f7;
+    font-size:13px;color:#3d4457;cursor:pointer;
+  }
+  .check:last-child{border-bottom:none;padding-bottom:2px}
+  .check input{
+    flex:none;width:16px;height:16px;margin:2px 0 0;accent-color:#4f6ef7;cursor:pointer;
+  }
+  .preview{
+    margin:0;padding:10px;border-radius:10px;background:#f7f8fc;color:#2d3448;
+    font-family:ui-monospace,SFMono-Regular,Consolas,"Courier New",monospace;
+    font-size:12px;line-height:1.7;white-space:pre-wrap;word-break:break-word;
+    max-height:260px;overflow:auto;
+  }
+  .actions{display:flex;gap:8px;margin-top:2px}
+  .btn{
+    flex:1 1 0;height:38px;border-radius:10px;border:1px solid transparent;font-family:inherit;
+    font-size:13px;font-weight:500;cursor:pointer;transition:background .15s,border-color .15s;
+  }
+  .btn-primary{background:#4f6ef7;color:#fff}
+  .btn-primary:hover{background:#4361e3}
+  .btn-ghost{background:#fff;border-color:#dfe4ef;color:#3c455c}
+  .btn-ghost:hover{border-color:#b9c2d8;background:#fafbff}
+  .status{min-height:18px;margin:8px 0 0;font-size:12px;color:#8a91a4;text-align:center}
+  .status.ok{color:#1f8a5a}
+</style>
+</head>
+<body>
+  <h1>过程检查清单</h1>
+  <p class="sub">对照清单逐条自检，勾选已经做到的项目。</p>
+
+  <div class="card">
+    <div class="progress-head"><span>完成进度</span><strong id="progressText">0/10 项</strong></div>
+    <div class="progress"><div id="progressBar" class="progress-bar"></div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">过程检查</div>
+    <label class="check"><input type="checkbox" data-group="process" value="已写清已知条件" /><span>已写清已知条件</span></label>
+    <label class="check"><input type="checkbox" data-group="process" value="每一步有依据" /><span>每一步有依据</span></label>
+    <label class="check"><input type="checkbox" data-group="process" value="数据记录完整" /><span>数据记录完整</span></label>
+    <label class="check"><input type="checkbox" data-group="process" value="结论有数据支撑" /><span>结论有数据支撑</span></label>
+    <label class="check"><input type="checkbox" data-group="process" value="说明了局限" /><span>说明了局限</span></label>
+  </div>
+
+  <div class="card">
+    <div class="card-title">成果检查</div>
+    <label class="check"><input type="checkbox" data-group="result" value="有标题与分工" /><span>有标题与分工</span></label>
+    <label class="check"><input type="checkbox" data-group="result" value="表格填写完整" /><span>表格填写完整</span></label>
+    <label class="check"><input type="checkbox" data-group="result" value="图表有标题和单位" /><span>图表有标题和单位</span></label>
+    <label class="check"><input type="checkbox" data-group="result" value="完成了自我评价" /><span>完成了自我评价</span></label>
+    <label class="check"><input type="checkbox" data-group="result" value="写完了反思" /><span>写完了反思</span></label>
+  </div>
+
+  <div class="card">
+    <div class="card-title">清单结果预览</div>
+    <pre id="preview" class="preview"></pre>
+  </div>
+
+  <div class="actions">
+    <button id="appendBtn" class="btn btn-primary" type="button">写入我的作答</button>
+    <button id="copyBtn" class="btn btn-ghost" type="button">复制结果</button>
+  </div>
+  <p id="status" class="status" role="status"></p>
+
+<script>
+(function () {
+  var boxes = Array.prototype.slice.call(document.querySelectorAll('input[type=checkbox]'));
+  var progressText = document.getElementById('progressText');
+  var progressBar = document.getElementById('progressBar');
+  var previewEl = document.getElementById('preview');
+  var statusEl = document.getElementById('status');
+  var GROUPS = [
+    { key: 'process', name: '过程检查' },
+    { key: 'result', name: '成果检查' }
+  ];
+
+  function buildText() {
+    var done = boxes.filter(function (box) { return box.checked; }).length;
+    var lines = ['过程检查清单', '完成进度：' + done + '/' + boxes.length + ' 项', ''];
+    GROUPS.forEach(function (group, gi) {
+      lines.push('【' + group.name + '】');
+      boxes.forEach(function (box) {
+        if (box.getAttribute('data-group') !== group.key) return;
+        lines.push((box.checked ? '✓ ' : '○ ') + box.value);
+      });
+      if (gi < GROUPS.length - 1) lines.push('');
+    });
+    return lines.join('\n');
+  }
+
+  function update() {
+    var done = boxes.filter(function (box) { return box.checked; }).length;
+    progressText.textContent = done + '/' + boxes.length + ' 项';
+    progressBar.style.width = (boxes.length ? done / boxes.length * 100 : 0) + '%';
+    previewEl.textContent = buildText();
+  }
+
+  function setStatus(msg, ok) {
+    statusEl.textContent = msg;
+    statusEl.className = 'status' + (ok ? ' ok' : '');
+  }
+
+  boxes.forEach(function (box) {
+    box.addEventListener('change', update);
+  });
+
+  document.getElementById('appendBtn').addEventListener('click', function () {
+    try {
+      window.parent.postMessage({ type: 'pbl-append', text: buildText() }, '*');
+      setStatus('已写入，请回到作答区查看', true);
+    } catch (err) {
+      setStatus('写入失败，请改用复制结果', false);
+    }
+  });
+
+  document.getElementById('copyBtn').addEventListener('click', function () {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(buildText()).then(function () {
+        setStatus('已复制，可直接粘贴', true);
+      }).catch(function () {
+        setStatus('复制失败，请手动选中复制', false);
+      });
+    } else {
+      setStatus('当前环境无法自动复制，请手动选中复制', false);
+    }
+  });
+
+  update();
+})();
+</script>
+</body>
+</html>

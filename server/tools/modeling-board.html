@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>建模思路拆解</title>
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    padding:14px 14px 18px;background:#fff;color:#1f2430;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    font-size:14px;line-height:1.6;overflow-x:hidden;
+  }
+  h1{margin:0 0 4px;font-size:16px;font-weight:600;color:#171c28}
+  .sub{margin:0 0 12px;font-size:12px;color:#7b8397;line-height:1.5}
+  .card{margin-bottom:10px;padding:12px;border:1px solid #e7eaf3;border-radius:12px;background:#fff}
+  .card-title{margin-bottom:8px;font-size:13px;font-weight:600;color:#2a3142}
+  .field{margin-bottom:10px}
+  .field:last-child{margin-bottom:0}
+  label{display:block;margin-bottom:5px;font-size:13px;color:#404859}
+  textarea{
+    display:block;width:100%;height:auto;min-height:70px;padding:8px 10px;border:1px solid #dfe4ef;
+    border-radius:9px;background:#fbfcff;color:#1f2430;font-size:14px;line-height:1.6;
+    font-family:inherit;outline:none;resize:vertical;transition:border-color .15s,box-shadow .15s;
+  }
+  textarea:focus{border-color:#4f6ef7;background:#fff;box-shadow:0 0 0 3px rgba(79,110,247,.12)}
+  .tip{margin-bottom:10px;padding:9px 11px;border-radius:9px;background:#eef2ff;color:#3b4a86;font-size:12px;line-height:1.6}
+  .preview{
+    margin:0;padding:10px;border-radius:10px;background:#f7f8fc;color:#2d3448;
+    font-family:ui-monospace,SFMono-Regular,Consolas,"Courier New",monospace;
+    font-size:12px;line-height:1.7;white-space:pre-wrap;word-break:break-word;
+    max-height:260px;overflow:auto;
+  }
+  .actions{display:flex;gap:8px;margin-top:2px}
+  .btn{
+    flex:1 1 0;height:38px;border-radius:10px;border:1px solid transparent;font-family:inherit;
+    font-size:13px;font-weight:500;cursor:pointer;transition:background .15s,border-color .15s;
+  }
+  .btn-primary{background:#4f6ef7;color:#fff}
+  .btn-primary:hover{background:#4361e3}
+  .btn-ghost{background:#fff;border-color:#dfe4ef;color:#3c455c}
+  .btn-ghost:hover{border-color:#b9c2d8;background:#fafbff}
+  .status{min-height:18px;margin:8px 0 0;font-size:12px;color:#8a91a4;text-align:center}
+  .status.ok{color:#1f8a5a}
+</style>
+</head>
+<body>
+  <h1>建模思路拆解</h1>
+  <p class="sub">把现实问题拆成条件、目标、关系式，再回到情境检验。</p>
+
+  <div class="card">
+    <div class="field">
+      <label for="given">① 已知条件与数据</label>
+      <textarea id="given" placeholder="例如：每个水龙头每分钟滴 20ml，共有 8 个水龙头；水价 3.5 元/吨。"></textarea>
+    </div>
+    <div class="field">
+      <label for="target">② 要求什么（带单位）</label>
+      <textarea id="target" placeholder="例如：这些水龙头一年浪费多少升水？合多少元？"></textarea>
+    </div>
+    <div class="field">
+      <label for="relation">③ 设元与数量关系（关系式 / 方程）</label>
+      <textarea id="relation" placeholder="例如：设每分钟流失 x L，则一年流失量 = x×60×24×365（L）。"></textarea>
+    </div>
+    <div class="field">
+      <label for="check">④ 结果检验</label>
+      <textarea id="check" placeholder="例如：把结果换算成吨，与家庭月用水量比较，判断是否合理。"></textarea>
+    </div>
+  </div>
+
+  <div class="tip">提示：写清“设什么为 x、依据什么关系列式、结果是否符合实际”。</div>
+
+  <div class="card">
+    <div class="card-title">建模提纲预览</div>
+    <pre id="preview" class="preview"></pre>
+  </div>
+
+  <div class="actions">
+    <button id="appendBtn" class="btn btn-primary" type="button">写入我的作答</button>
+    <button id="copyBtn" class="btn btn-ghost" type="button">复制结果</button>
+  </div>
+  <p id="status" class="status" role="status"></p>
+
+<script>
+(function () {
+  var statusEl = document.getElementById('status');
+  var previewEl = document.getElementById('preview');
+  var sections = [
+    { label: '一、已知条件与数据', el: document.getElementById('given') },
+    { label: '二、要求什么', el: document.getElementById('target') },
+    { label: '三、设元与数量关系', el: document.getElementById('relation') },
+    { label: '四、结果检验', el: document.getElementById('check') }
+  ];
+
+  function buildText() {
+    var lines = ['建模提纲', ''];
+    sections.forEach(function (section, i) {
+      lines.push(section.label);
+      lines.push(section.el.value.trim() || '（待补充）');
+      if (i < sections.length - 1) lines.push('');
+    });
+    return lines.join('\n');
+  }
+
+  function update() {
+    previewEl.textContent = buildText();
+  }
+
+  function setStatus(msg, ok) {
+    statusEl.textContent = msg;
+    statusEl.className = 'status' + (ok ? ' ok' : '');
+  }
+
+  sections.forEach(function (section) {
+    section.el.addEventListener('input', update);
+  });
+
+  document.getElementById('appendBtn').addEventListener('click', function () {
+    try {
+      window.parent.postMessage({ type: 'pbl-append', text: buildText() }, '*');
+      setStatus('已写入，请回到作答区查看', true);
+    } catch (err) {
+      setStatus('写入失败，请改用复制结果', false);
+    }
+  });
+
+  document.getElementById('copyBtn').addEventListener('click', function () {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(buildText()).then(function () {
+        setStatus('已复制，可直接粘贴', true);
+      }).catch(function () {
+        setStatus('复制失败，请手动选中复制', false);
+      });
+    } else {
+      setStatus('当前环境无法自动复制，请手动选中复制', false);
+    }
+  });
+
+  update();
+})();
+</script>
+</body>
+</html>
