@@ -2,6 +2,14 @@
 
 面向初中数学教师与学生的项目式学习（PBL）数字化平台，围绕**数与代数、图形与几何、统计与概率**三大板块，以**任务单**为核心载体。当前版本已完成基础业务闭环：模板复制、副本编辑、班级管理、发布任务、学生提交、教师批阅、成果分析，并内置**规则版 AI 辅助侧栏**（第二迭代接入大模型 API）。
 
+## 在线访问
+
+- 平台入口：https://xiaoqing-alt.github.io/math-pbl-platform/
+- 代码仓库：https://github.com/xiaoqing-alt/math-pbl-platform
+- 后端服务：https://math-pbl-api-production.up.railway.app （GitHub Pages 静态前端 + Railway Node 服务）
+- 演示账号：教师 `teacher / 123456`，学生 `student / 123456`
+- 说明：后端为免费实例，闲置后会休眠，首次打开约需 30–50 秒唤醒；重新部署或重启后 SQLite 数据与上传文件会重置。
+
 ## 功能一览
 
 | 模块 | 已实现能力 |
