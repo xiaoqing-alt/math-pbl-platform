@@ -11,4 +11,4 @@ services:
       - key: NODE_VERSION
         value: "22"
       - key: CORS_ORIGIN
-        value: https://lll123-design.github.io
+        value: https://xiaoqing-alt.github.io
