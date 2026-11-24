@@ -17,6 +17,7 @@ export default function Login() {
   const [username, setUsername] = useState(role === 'teacher' ? 'teacher' : 'student');
   const [password, setPassword] = useState('123456');
   const [displayName, setDisplayName] = useState('');
+  const [inviteCode, setInviteCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
@@ -52,7 +53,7 @@ export default function Login() {
       const result = await api<LoginResponse>('/auth/register', {
         method: 'POST',
         auth: false,
-        body: { role: 'teacher', username: username.trim(), password, displayName },
+        body: { role: 'teacher', username: username.trim(), password, displayName, inviteCode: inviteCode.trim() },
       });
       saveAuth(result.token, result.user);
       navigate('/teacher');
@@ -111,14 +112,24 @@ export default function Login() {
             />
           </label>
           {showRegister && (
-            <label className="field">
-              <span>姓名</span>
-              <input
-                value={displayName}
-                onChange={(event) => setDisplayName(event.target.value)}
-                placeholder="例如：李老师"
-              />
-            </label>
+            <>
+              <label className="field">
+                <span>姓名</span>
+                <input
+                  value={displayName}
+                  onChange={(event) => setDisplayName(event.target.value)}
+                  placeholder="例如：李老师"
+                />
+              </label>
+              <label className="field">
+                <span>教师邀请码</span>
+                <input
+                  value={inviteCode}
+                  onChange={(event) => setInviteCode(event.target.value)}
+                  placeholder="向平台管理员索取"
+                />
+              </label>
+            </>
           )}
 
           {error && <div className="alert error">{error}</div>}

@@ -13,6 +13,13 @@ router.post('/register', (req, res) => {
   if (role !== 'teacher') {
     return res.status(403).json({ message: '学生账号由教师创建，平台不开放学生自助注册' });
   }
+  const inviteCode = String(process.env.TEACHER_INVITE_CODE || '').trim();
+  if (!inviteCode) {
+    return res.status(403).json({ message: '平台暂未开放教师自助注册，请联系管理员开通账号' });
+  }
+  if (String(req.body.inviteCode || '').trim() !== inviteCode) {
+    return res.status(403).json({ message: '教师邀请码不正确' });
+  }
   if (!username) return res.status(400).json({ message: '用户名不能为空' });
   if (username.length > 32) return res.status(400).json({ message: '用户名不能超过 32 个字符' });
   if (password.length < 6) return res.status(400).json({ message: '密码至少需要 6 位' });

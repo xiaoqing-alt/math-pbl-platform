@@ -155,7 +155,15 @@
 
   document.getElementById('appendBtn').addEventListener('click', function () {
     try {
-      window.parent.postMessage({ type: 'pbl-append', text: buildText() }, '*');
+      const targetOrigin = (() => {
+        try {
+          const raw = new URLSearchParams(location.search).get('parentOrigin');
+          return raw ? decodeURIComponent(raw) : '*';
+        } catch {
+          return '*';
+        }
+      })();
+      window.parent.postMessage({ type: 'pbl-append', text: buildText() }, targetOrigin);
       setStatus('已写入，请回到作答区查看', true);
     } catch (err) {
       setStatus('写入失败，请改用复制结果', false);

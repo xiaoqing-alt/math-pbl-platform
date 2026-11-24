@@ -26,6 +26,7 @@ export default function TaskEditor() {
   const [dueAt, setDueAt] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [aiSaving, setAiSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
@@ -125,14 +126,43 @@ export default function TaskEditor() {
   }, [taskId]);
 
   function patchTask(partial: Partial<Task>) {
+    setDirty(true);
     setTask((current) => (current ? { ...current, ...partial } : current));
   }
 
   function patchContent(partial: Partial<TaskContent>) {
+    setDirty(true);
     setTask((current) =>
       current ? { ...current, content: { ...current.content, ...partial } } : current,
     );
   }
+
+  useEffect(() => {
+    if (!dirty) return;
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [dirty]);
+
+  useEffect(() => {
+    if (!dirty) return;
+    const handleClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null;
+      const anchor = target?.closest('a');
+      if (!anchor) return;
+      const href = anchor.getAttribute('href');
+      if (!href || href.startsWith('#') || href.startsWith('http')) return;
+      if (!window.confirm('有未保存的修改，离开后将会丢失。确定离开吗？')) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    };
+    document.addEventListener('click', handleClick, true);
+    return () => document.removeEventListener('click', handleClick, true);
+  }, [dirty]);
 
   if (!task) {
     return <div className="empty-state">{error || '正在加载任务单…'}</div>;
@@ -206,6 +236,7 @@ export default function TaskEditor() {
       });
       setTask(data.task);
       setSkills(data.availableSkills);
+      setDirty(false);
       setMessage('已保存。AI辅助能力已根据最新任务单内容重新匹配。');
     } catch (err: any) {
       setError(err.message || '保存失败');
@@ -637,9 +668,13 @@ export default function TaskEditor() {
                   />
                 </label>
                 <p className="muted small-text">
-                  工具运行在沙箱 iframe 中，不能读取平台登录信息；需要回写结果时调用
+                  工具运行在沙箱 iframe 中，不能读取平台登录信息；需要回写结果时，请把消息发给平台通过
                   {' '}
-                  <code>window.parent.postMessage({'{ type: "pbl-append", text }'}, "*")</code>。
+                  <code>parentOrigin</code>
+                  {' '}
+                  参数传入的父页面来源，不要写死为
+                  {' '}
+                  <code>"*"</code>。
                 </p>
                 <button className="outline-btn" type="button" onClick={uploadTool} disabled={uploadingTool}>
                   {uploadingTool ? '上传中…' : '上传到工具库'}

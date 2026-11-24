@@ -117,6 +117,17 @@ CREATE TABLE IF NOT EXISTS tools (
   category TEXT NOT NULL DEFAULT 'assist',
   created_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS upload_files (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  file_name TEXT NOT NULL,
+  original_name TEXT DEFAULT '',
+  size INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_upload_files_user ON upload_files (user_id);
 `);
 
 const submissionColumns = db.prepare('PRAGMA table_info(submissions)').all();

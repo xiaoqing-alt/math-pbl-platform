@@ -14,18 +14,21 @@ export function ToolFrame({
 }) {
   const ref = useRef<HTMLIFrameElement>(null);
   const token = getToken();
+  const apiOrigin = API_BASE ? new URL(API_BASE).origin : window.location.origin;
 
   useEffect(() => {
     function handle(event: MessageEvent) {
       if (!ref.current || event.source !== ref.current.contentWindow) return;
+      // 沙箱 iframe 为不透明源（origin 为 "null"），只接受这两种来源
+      if (event.origin !== 'null' && event.origin !== apiOrigin) return;
       const data = event.data as { type?: string; text?: unknown } | null;
       if (data && data.type === 'pbl-append' && typeof data.text === 'string') {
-        onAppend?.(data.text);
+        onAppend?.(data.text.slice(0, 20000));
       }
     }
     window.addEventListener('message', handle);
     return () => window.removeEventListener('message', handle);
-  }, [onAppend]);
+  }, [onAppend, apiOrigin]);
 
   return (
     <iframe
@@ -33,7 +36,7 @@ export function ToolFrame({
       className="tool-frame"
       title={title}
       sandbox="allow-scripts allow-forms allow-popups"
-      src={`${API_BASE}/tools/${encodeURIComponent(toolKey)}/file?token=${encodeURIComponent(token)}`}
+      src={`${API_BASE}/tools/${encodeURIComponent(toolKey)}/file?token=${encodeURIComponent(token)}&parentOrigin=${encodeURIComponent(window.location.origin)}`}
     />
   );
 }
