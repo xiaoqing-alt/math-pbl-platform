@@ -18,10 +18,13 @@ let sqlite = null;
 let pool = null;
 
 if (USE_POSTGRES) {
+  // Railway 内网数据库（*.railway.internal）与本机数据库不启用 SSL，公网托管库默认启用
+  const needsSsl =
+    !DATABASE_URL.includes('sslmode=disable') && !DATABASE_URL.includes('.railway.internal');
   pool = new pg.Pool({
     connectionString: DATABASE_URL,
     max: Number(process.env.PG_POOL_MAX || 5),
-    ssl: DATABASE_URL.includes('sslmode=disable') ? false : { rejectUnauthorized: false },
+    ssl: needsSsl ? { rejectUnauthorized: false } : false,
   });
 } else {
   sqlite = new DatabaseSync(path.join(DATA_DIR, 'math-pbl.db'));
