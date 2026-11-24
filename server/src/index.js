@@ -3,7 +3,7 @@ import cors from 'cors';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { initSchema, closeDatabase, UPLOAD_DIR } from './db.js';
+import { initSchema, closeDatabase, UPLOAD_DIR, getDbInfo } from './db.js';
 import { runSeed } from './seed.js';
 import authRouter from './routes/auth.js';
 import { classesRouter } from './routes/classes.js';
@@ -43,6 +43,10 @@ app.use(express.json({ limit: '6mb' }));
 
 app.get('/api/health', (req, res) => {
   res.json({ ok: true, service: 'math-pbl-platform', time: new Date().toISOString() });
+});
+
+app.get('/api/debug/db', (req, res) => {
+  res.json(getDbInfo());
 });
 
 app.use('/api/auth', authRouter);

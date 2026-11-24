@@ -14,6 +14,25 @@ fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 const DATABASE_URL = String(process.env.DATABASE_URL || '').trim();
 export const USE_POSTGRES = Boolean(DATABASE_URL);
 
+// 临时调试：报告运行时实际使用的数据库模式与目标主机（定位持久化问题用，验证后移除）
+export function getDbInfo() {
+  let host = '';
+  if (DATABASE_URL) {
+    try {
+      const u = new URL(DATABASE_URL);
+      host = u.host;
+    } catch {
+      host = '(无法解析)';
+    }
+  }
+  return {
+    usePostgres: USE_POSTGRES,
+    hasDatabaseUrl: Boolean(DATABASE_URL),
+    databaseUrlRawPreview: DATABASE_URL ? `${DATABASE_URL.slice(0, 12)}...` : '(空)',
+    host,
+  };
+}
+
 let sqlite = null;
 let pool = null;
 
