@@ -3,7 +3,7 @@ import cors from 'cors';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { initSchema, closeDatabase, UPLOAD_DIR, getDbInfo } from './db.js';
+import { initSchema, closeDatabase, UPLOAD_DIR, getDbInfo, probePostgresConnection } from './db.js';
 import { runSeed } from './seed.js';
 import authRouter from './routes/auth.js';
 import { classesRouter } from './routes/classes.js';
@@ -17,8 +17,14 @@ import toolsRouter from './routes/tools.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 3001);
 
-await initSchema();
-await runSeed();
+try {
+  await probePostgresConnection();
+  await initSchema();
+  await runSeed();
+} catch (error) {
+  console.error('[startup] 数据库初始化失败：', error && error.stack ? error.stack : error);
+  process.exit(1);
+}
 
 const app = express();
 

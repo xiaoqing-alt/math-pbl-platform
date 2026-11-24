@@ -36,18 +36,59 @@ export function getDbInfo() {
 let sqlite = null;
 let pool = null;
 
-if (USE_POSTGRES) {
-  // Railway 内网数据库（*.railway.internal）与本机数据库不启用 SSL，公网托管库默认启用
-  const needsSsl =
-    !DATABASE_URL.includes('sslmode=disable') && !DATABASE_URL.includes('.railway.internal');
-  pool = new pg.Pool({
+// 创建 Postgres 连接池。managed 数据库（Railway/Neon/Supabase）通常需要 SSL；
+// 用 rejectUnauthorized:false 兼容自签证书。sslmode=disable 时显式关闭。
+function createPool(useSsl) {
+  return new pg.Pool({
     connectionString: DATABASE_URL,
     max: Number(process.env.PG_POOL_MAX || 5),
-    ssl: needsSsl ? { rejectUnauthorized: false } : false,
+    ssl: useSsl ? { rejectUnauthorized: false } : false,
+  });
+}
+
+if (USE_POSTGRES) {
+  const useSsl = !DATABASE_URL.includes('sslmode=disable');
+  pool = createPool(useSsl);
+  pool.on('error', (err) => {
+    console.error('[pg pool error]', err && err.message ? err.message : err);
   });
 } else {
   sqlite = new DatabaseSync(path.join(DATA_DIR, 'math-pbl.db'));
   sqlite.exec('PRAGMA journal_mode = WAL;');
+}
+
+// 启动时先做一次连通性探测；若 SSL 握手失败，自动回退到不使用 SSL 再试一次。
+export async function probePostgresConnection() {
+  if (!USE_POSTGRES) return;
+  const tryQuery = async () => {
+    const client = await pool.connect();
+    try {
+      await client.query('SELECT 1');
+    } finally {
+      client.release();
+    }
+  };
+  try {
+    await tryQuery();
+    console.log('[pg] connection OK (ssl enabled)');
+    return;
+  } catch (error) {
+    const msg = String((error && error.message) || '');
+    console.error('[pg] first connect failed:', msg);
+    if (!/ssl|tls|encrypted|self[- ]signed|certificate/i.test(msg) || DATABASE_URL.includes('sslmode=disable')) {
+      throw error;
+    }
+  }
+  // 回退：关闭 SSL 重试
+  try {
+    await pool.end();
+  } catch {
+    // ignore
+  }
+  pool = createPool(false);
+  pool.on('error', (err) => console.error('[pg pool error]', err && err.message ? err.message : err));
+  await tryQuery();
+  console.log('[pg] connection OK (ssl disabled, fallback)');
 }
 
 // SQLite 使用 ? 占位符，Postgres 使用 $1、$2；这里做统一转换（跳过单引号内的内容）
