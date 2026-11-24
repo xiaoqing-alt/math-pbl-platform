@@ -168,6 +168,21 @@ export interface Analysis {
   note: string;
 }
 
+export interface CriteriaScore {
+  name: string;
+  score: number;
+  comment: string;
+  weight: number;
+}
+
+export interface SubmissionVersion {
+  id: number;
+  versionNo: number;
+  createdAt: string;
+  wordCount: number;
+  fileCount: number;
+}
+
 export interface Submission {
   id: number;
   assignmentId: number;
@@ -175,12 +190,15 @@ export interface Submission {
   content: string;
   worksheet: Worksheet;
   files: FileInfo[];
-  status: 'draft' | 'submitted';
+  status: 'draft' | 'submitted' | 'returned';
   analysis: Analysis | null;
   submittedAt: string;
   score: number | null;
   feedback: string;
   gradedAt: string;
+  criteriaScores: CriteriaScore[];
+  returnedAt: string;
+  returnNote: string;
   updatedAt: string;
   studentName?: string;
   username?: string;
@@ -226,7 +244,9 @@ export interface ClassReport {
   submissionRate: number;
   averageScore: number;
   distribution: { label: string; count: number }[];
-  dimensions: { name: string; average: number }[];
+  dimensions: { name: string; average: number; count?: number }[];
+  dimensionSource?: 'teacher' | 'analysis';
+  criteria?: { name: string; weight: number }[];
   topStrengths: { text: string; count: number }[];
   topImprovements: { text: string; count: number }[];
   criteriaCount: number;
@@ -235,9 +255,11 @@ export interface ClassReport {
     displayName: string;
     username: string;
     submitted: boolean;
+    returned?: boolean;
     score: number | null;
     suggestedScore: number | null;
     graded: boolean;
+    criteriaScores?: CriteriaScore[];
     updatedAt: string;
   }[];
 }
@@ -260,7 +282,7 @@ export interface StudentTaskCard {
   aiEnabled: boolean;
   submission: {
     id: number;
-    status: 'draft' | 'submitted';
+    status: 'draft' | 'submitted' | 'returned';
     score: number | null;
     gradedAt: string;
     submittedAt: string;

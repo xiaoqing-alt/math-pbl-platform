@@ -221,19 +221,49 @@ export function buildClassReport({ students, submissions, criteria }) {
     else distribution[4].count += 1;
   }
 
-  const dimensionMap = new Map();
-  for (const item of submitted) {
-    const dimensions = item.analysis && Array.isArray(item.analysis.dimensions) ? item.analysis.dimensions : [];
-    for (const dim of dimensions) {
-      if (!dimensionMap.has(dim.name)) dimensionMap.set(dim.name, []);
-      dimensionMap.get(dim.name).push(Number(dim.score) || 0);
-    }
-  }
+  const criteriaList = (criteria || []).filter((item) => item && item.name);
+  const teacherScored = submitted.filter(
+    (item) => Array.isArray(item.criteriaScores) && item.criteriaScores.length > 0,
+  );
 
-  const dimensions = Array.from(dimensionMap.entries()).map(([name, values]) => ({
-    name,
-    average: Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 10) / 10,
-  }));
+  let dimensions = [];
+  let dimensionSource = 'analysis';
+
+  if (teacherScored.length > 0) {
+    dimensionSource = 'teacher';
+    const names = criteriaList.length
+      ? criteriaList.map((item) => item.name)
+      : Array.from(new Set(teacherScored.flatMap((item) => item.criteriaScores.map((entry) => entry.name))));
+    dimensions = names
+      .map((name) => {
+        const values = teacherScored
+          .map((item) => (item.criteriaScores || []).find((entry) => entry.name === name))
+          .filter(Boolean)
+          .map((entry) => Number(entry.score) || 0);
+        return {
+          name,
+          average: values.length ? Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 10) / 10 : 0,
+          count: values.length,
+        };
+      })
+      .filter((item) => item.count > 0);
+  } else {
+    const dimensionMap = new Map();
+    for (const item of submitted) {
+      const analysisDimensions =
+        item.analysis && Array.isArray(item.analysis.dimensions) ? item.analysis.dimensions : [];
+      for (const dim of analysisDimensions) {
+        if (!dimensionMap.has(dim.name)) dimensionMap.set(dim.name, []);
+        dimensionMap.get(dim.name).push(Number(dim.score) || 0);
+      }
+    }
+
+    dimensions = Array.from(dimensionMap.entries()).map(([name, values]) => ({
+      name,
+      average: Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 10) / 10,
+      count: values.length,
+    }));
+  }
 
   const strengthCount = new Map();
   const improvementCount = new Map();
@@ -261,6 +291,8 @@ export function buildClassReport({ students, submissions, criteria }) {
     averageScore: average,
     distribution,
     dimensions,
+    dimensionSource,
+    criteria: criteriaList.map((item) => ({ name: item.name, weight: Number(item.weight) || 0 })),
     topStrengths: top(strengthCount),
     topImprovements: top(improvementCount),
     criteriaCount: (criteria || []).length,
@@ -271,9 +303,11 @@ export function buildClassReport({ students, submissions, criteria }) {
         displayName: student.displayName,
         username: student.username,
         submitted: Boolean(submission && submission.status === 'submitted'),
+        returned: Boolean(submission && submission.status === 'returned'),
         score: submission && submission.score !== null ? submission.score : null,
         suggestedScore: submission && submission.analysis ? submission.analysis.suggestedScore : null,
         graded: Boolean(submission && submission.gradedAt),
+        criteriaScores: submission && Array.isArray(submission.criteriaScores) ? submission.criteriaScores : [],
         updatedAt: submission ? submission.updatedAt : '',
       };
     }),

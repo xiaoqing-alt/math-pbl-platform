@@ -1,5 +1,5 @@
 import express from 'express';
-import { db, parseJson, serializeSubmission, serializeTask } from '../db.js';
+import { db, parseJson, serializeSubmission, serializeTask, normalizeContent } from '../db.js';
 import { requireAuth, requireRole } from '../auth.js';
 import { buildClassReport } from '../analysis.js';
 
@@ -10,6 +10,50 @@ router.use(requireAuth, requireRole('teacher'));
 function parseId(value) {
   const n = Number(value);
   return Number.isInteger(n) && n > 0 ? n : null;
+}
+
+function listVersionSummaries(submissionId) {
+  return db
+    .prepare(
+      'SELECT id, version_no, content, files, created_at FROM submission_versions WHERE submission_id = ? ORDER BY version_no DESC',
+    )
+    .all(submissionId)
+    .map((row) => ({
+      id: Number(row.id),
+      versionNo: Number(row.version_no),
+      createdAt: row.created_at,
+      wordCount: Array.from(String(row.content || '').replace(/\s/g, '')).length,
+      fileCount: parseJson(row.files, []).length,
+    }));
+}
+
+function normalizeCriteriaScores(raw, criteria) {
+  if (!Array.isArray(raw)) return [];
+  const allowed = new Map((criteria || []).map((item) => [item.name, item]));
+  const result = [];
+  for (const item of raw) {
+    const name = String((item && item.name) || '').trim();
+    if (!name) continue;
+    if (allowed.size > 0 && !allowed.has(name)) continue;
+    const value = Number(item && item.score);
+    if (!Number.isFinite(value)) continue;
+    result.push({
+      name,
+      score: Math.max(0, Math.min(100, Math.round(value * 10) / 10)),
+      comment: String((item && item.comment) || '').trim(),
+      weight: Number((allowed.get(name) || {}).weight) || 0,
+    });
+  }
+  return result;
+}
+
+function weightedScore(criteria, scores) {
+  if (!Array.isArray(criteria) || criteria.length === 0) return null;
+  const map = new Map(scores.map((item) => [item.name, item.score]));
+  if (criteria.some((item) => !map.has(item.name))) return null;
+  const totalWeight = criteria.reduce((sum, item) => sum + (Number(item.weight) || 1), 0);
+  const sum = criteria.reduce((acc, item) => acc + map.get(item.name) * (Number(item.weight) || 1), 0);
+  return Math.round((sum / totalWeight) * 10) / 10;
 }
 
 function getOwnedAssignment(assignmentId, teacherId) {
@@ -64,6 +108,7 @@ router.get('/:id', (req, res) => {
             updatedAt: submission.updated_at,
             score: submission.score === null || submission.score === undefined ? null : Number(submission.score),
             gradedAt: submission.graded_at || '',
+            returned: submission.status === 'returned',
             hasFeedback: Boolean(submission.feedback),
             wordCount: analysis ? analysis.wordCount : 0,
             fileCount: analysis ? analysis.fileCount : 0,
@@ -190,6 +235,7 @@ submissionRouter.get('/:id', (req, res) => {
       board: row.board,
       content: parseJson(row.task_content, {}),
     },
+    versions: listVersionSummaries(submissionId),
     assignmentStatus: row.assignment_status,
   });
 });
@@ -200,7 +246,7 @@ submissionRouter.patch('/:id', (req, res) => {
 
   const row = db
     .prepare(
-      `SELECT s.*, a.teacher_id FROM submissions s JOIN assignments a ON a.id = s.assignment_id
+      `SELECT s.*, a.teacher_id, a.task_id FROM submissions s JOIN assignments a ON a.id = s.assignment_id
        WHERE s.id = ? AND a.teacher_id = ?`,
     )
     .get(submissionId, req.user.id);
@@ -210,28 +256,51 @@ submissionRouter.patch('/:id', (req, res) => {
   }
 
   const body = req.body || {};
-  let score = row.score;
-  if (body.score !== undefined) {
-    if (body.score === null || body.score === '') {
-      score = null;
-    } else {
-      const value = Number(body.score);
-      if (!Number.isFinite(value) || value < 0 || value > 100) {
-        return res.status(400).json({ message: '分数需在 0—100 之间' });
-      }
-      score = value;
+  const taskRow = db.prepare('SELECT content FROM tasks WHERE id = ?').get(row.task_id);
+  const taskContent = normalizeContent(parseJson(taskRow && taskRow.content, {}));
+  const criteria = taskContent.criteria || [];
+  const now = new Date().toISOString();
+  const feedback = body.feedback === undefined ? row.feedback : String(body.feedback || '');
+
+  if (body.action === 'return') {
+    if (!String(feedback).trim()) {
+      return res.status(400).json({ message: '退回修改需要填写具体原因或修改建议' });
     }
+    db.prepare(
+      `UPDATE submissions SET status = 'returned', return_note = ?, returned_at = ?,
+        score = NULL, criteria_scores = '[]', graded_at = '' WHERE id = ?`,
+    ).run(String(feedback).trim(), now, submissionId);
+
+    const updated = db
+      .prepare(
+        'SELECT s.*, u.display_name AS student_name, u.username AS username FROM submissions s JOIN users u ON u.id = s.student_id WHERE s.id = ?',
+      )
+      .get(submissionId);
+    return res.json({ submission: serializeSubmission(updated), message: '已退回给学生修改，学生可重新提交' });
   }
 
-  const feedback = body.feedback === undefined ? row.feedback : String(body.feedback || '');
-  const now = new Date().toISOString();
+  const criteriaScores = normalizeCriteriaScores(body.criteriaScores, criteria);
+  let score = row.score;
+  if (body.score !== undefined && body.score !== null && body.score !== '') {
+    const value = Number(body.score);
+    if (!Number.isFinite(value) || value < 0 || value > 100) {
+      return res.status(400).json({ message: '分数需在 0—100 之间' });
+    }
+    score = value;
+  } else if (criteriaScores.length > 0) {
+    const computed = weightedScore(criteria, criteriaScores);
+    if (computed === null) {
+      return res.status(400).json({ message: '请完成全部评价维度的打分，或直接填写总分' });
+    }
+    score = computed;
+  } else if (body.score === null || body.score === '') {
+    score = null;
+  }
 
-  db.prepare('UPDATE submissions SET score = ?, feedback = ?, graded_at = ? WHERE id = ?').run(
-    score,
-    feedback,
-    now,
-    submissionId,
-  );
+  db.prepare(
+    `UPDATE submissions SET score = ?, feedback = ?, criteria_scores = ?, graded_at = ?,
+      status = 'submitted', returned_at = '' WHERE id = ?`,
+  ).run(score, feedback, JSON.stringify(criteriaScores), now, submissionId);
 
   const updated = db
     .prepare('SELECT s.*, u.display_name AS student_name, u.username AS username FROM submissions s JOIN users u ON u.id = s.student_id WHERE s.id = ?')

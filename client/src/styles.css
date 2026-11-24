@@ -454,6 +454,11 @@ p {
   background: #f0f2f7;
 }
 
+.status-badge.returned {
+  color: #b0413e;
+  background: #fdecec;
+}
+
 .official-badge {
   display: inline-flex;
   align-items: center;
@@ -3085,5 +3090,127 @@ p {
   .tool-search {
     max-width: none;
     width: 100%;
+  }
+}
+
+/* ---------- 教学闭环：维度评分 / 退回修改 / 提交版本 ---------- */
+.criteria-grade {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  background: #fbfcff;
+  margin: 14px 0;
+}
+
+.criteria-grade-row {
+  border-top: 1px dashed var(--line-strong);
+  padding: 10px 0 4px;
+}
+
+.criteria-grade-row:first-of-type {
+  border-top: none;
+  padding-top: 4px;
+}
+
+.criteria-grade-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13.5px;
+}
+
+.criteria-grade-row p {
+  margin: 2px 0 6px;
+}
+
+.criteria-grade-inputs {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 8px;
+}
+
+.criteria-grade-inputs input {
+  padding: 7px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  font-size: 13px;
+  background: #fff;
+  width: 100%;
+}
+
+.version-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.version-chip {
+  font-size: 11.5px;
+  color: #4a546b;
+  background: #f2f4fa;
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+
+.criteria-feedback {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 6px 0 10px;
+  font-size: 13px;
+  color: #3f4860;
+}
+
+.criteria-feedback-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.criteria-feedback-name {
+  min-width: 96px;
+  color: var(--muted);
+}
+
+.report-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.math-block {
+  display: block;
+  overflow-x: auto;
+  margin: 6px 0;
+}
+
+@media print {
+  .topbar,
+  .footer,
+  .page-head,
+  .grading-layout,
+  .alert,
+  .report-actions {
+    display: none !important;
+  }
+
+  body {
+    background: #fff;
+  }
+
+  .main {
+    width: 100%;
+    padding: 0;
+  }
+
+  .report-panel {
+    border: none;
+    box-shadow: none;
+    margin: 0;
+    padding: 0;
   }
 }

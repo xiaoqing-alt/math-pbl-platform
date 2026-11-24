@@ -15,6 +15,7 @@ const STATUS_LABELS: Record<string, { text: string; tone: string }> = {
   pending: { text: '待完成', tone: 'pending' },
   draft: { text: '草稿', tone: 'pending' },
   submitted: { text: '已提交', tone: 'submitted' },
+  returned: { text: '退回修改', tone: 'returned' },
   graded: { text: '已批阅', tone: 'graded' },
   withdrawn: { text: '已撤回', tone: 'withdrawn' },
 };

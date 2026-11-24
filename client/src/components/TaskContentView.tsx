@@ -1,5 +1,6 @@
 import { fileUrl, formatFileSize } from '../api';
 import type { TaskContent } from '../types';
+import MathText from './MathText';
 
 export default function TaskContentView({ content }: { content: TaskContent }) {
   return (
@@ -7,7 +8,9 @@ export default function TaskContentView({ content }: { content: TaskContent }) {
       {content.background && (
         <div className="content-section">
           <h2>项目背景</h2>
-          <p className="prose">{content.background}</p>
+          <p className="prose">
+            <MathText text={content.background} />
+          </p>
         </div>
       )}
 
@@ -16,7 +19,9 @@ export default function TaskContentView({ content }: { content: TaskContent }) {
           <h2>项目目标</h2>
           <ul className="objective-list">
             {content.objectives.map((item, index) => (
-              <li key={`${item}-${index}`}>{item}</li>
+              <li key={`${item}-${index}`}>
+                <MathText text={item} />
+              </li>
             ))}
           </ul>
         </div>
@@ -38,7 +43,9 @@ export default function TaskContentView({ content }: { content: TaskContent }) {
       {content.description && (
         <div className="content-section">
           <h2>驱动问题与成果要求</h2>
-          <p className="prose">{content.description}</p>
+          <p className="prose">
+            <MathText text={content.description} />
+          </p>
         </div>
       )}
 
@@ -50,8 +57,14 @@ export default function TaskContentView({ content }: { content: TaskContent }) {
               <div className="step-item" key={index}>
                 <span className="step-index">{index + 1}</span>
                 <div>
-                  <h3>{step.title || `第 ${index + 1} 步`}</h3>
-                  {step.content && <p>{step.content}</p>}
+                  <h3>
+                    <MathText text={step.title || `第 ${index + 1} 步`} />
+                  </h3>
+                  {step.content && (
+                    <p>
+                      <MathText text={step.content} />
+                    </p>
+                  )}
                 </div>
               </div>
             ))}
@@ -64,12 +77,20 @@ export default function TaskContentView({ content }: { content: TaskContent }) {
           <h2>项目进程</h2>
           {content.stages.map((stage, index) => (
             <div className="stage-card" key={index}>
-              <h3>{stage.title || `阶段 ${index + 1}`}</h3>
-              {stage.intro && <p className="muted small-text">{stage.intro}</p>}
+              <h3>
+                <MathText text={stage.title || `阶段 ${index + 1}`} />
+              </h3>
+              {stage.intro && (
+                <p className="muted small-text">
+                  <MathText text={stage.intro} />
+                </p>
+              )}
               {stage.items.length > 0 && (
                 <ol className="stage-items">
                   {stage.items.map((item, itemIndex) => (
-                    <li key={itemIndex}>{item}</li>
+                    <li key={itemIndex}>
+                      <MathText text={item} />
+                    </li>
                   ))}
                 </ol>
               )}
@@ -93,7 +114,11 @@ export default function TaskContentView({ content }: { content: TaskContent }) {
                   </table>
                 </div>
               )}
-              {stage.prompt && <p className="stage-prompt">✎ {stage.prompt}</p>}
+              {stage.prompt && (
+                <p className="stage-prompt">
+                  ✎ <MathText text={stage.prompt} />
+                </p>
+              )}
             </div>
           ))}
         </div>
@@ -116,11 +141,21 @@ export default function TaskContentView({ content }: { content: TaskContent }) {
               <tbody>
                 {content.rubric.map((item, index) => (
                   <tr key={`${item.name}-${index}`}>
-                    <td>{item.name}</td>
-                    <td>{item.a || '—'}</td>
-                    <td>{item.b || '—'}</td>
-                    <td>{item.c || '—'}</td>
-                    <td>{item.d || '—'}</td>
+                    <td>
+                      <MathText text={item.name} />
+                    </td>
+                    <td>
+                      <MathText text={item.a || '—'} />
+                    </td>
+                    <td>
+                      <MathText text={item.b || '—'} />
+                    </td>
+                    <td>
+                      <MathText text={item.c || '—'} />
+                    </td>
+                    <td>
+                      <MathText text={item.d || '—'} />
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -155,9 +190,13 @@ export default function TaskContentView({ content }: { content: TaskContent }) {
               <tbody>
                 {content.criteria.map((item, index) => (
                   <tr key={`${item.name}-${index}`}>
-                    <td>{item.name}</td>
+                    <td>
+                      <MathText text={item.name} />
+                    </td>
                     <td>{item.weight ? `${item.weight}%` : '—'}</td>
-                    <td>{item.description || '—'}</td>
+                    <td>
+                      <MathText text={item.description || '—'} />
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -171,8 +210,14 @@ export default function TaskContentView({ content }: { content: TaskContent }) {
           <h2>配套参考范例</h2>
           {content.references.map((reference, index) => (
             <div className="reference-item" key={index}>
-              <h3>{reference.title || `范例 ${index + 1}`}</h3>
-              {reference.content && <p>{reference.content}</p>}
+              <h3>
+                <MathText text={reference.title || `范例 ${index + 1}`} />
+              </h3>
+              {reference.content && (
+                <p>
+                  <MathText text={reference.content} />
+                </p>
+              )}
               {reference.images && reference.images.length > 0 && (
                 <div className="reference-images">
                   {reference.images.map((image) => (

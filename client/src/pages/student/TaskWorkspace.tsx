@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api, formatDate, formatDateTime, fileUrl, uploadFile } from '../../api';
-import type { AiGuide, AiSkill, Analysis, FileInfo, Submission, Task, ToolInfo, Worksheet } from '../../types';
+import type { AiGuide, AiSkill, Analysis, FileInfo, Submission, SubmissionVersion, Task, ToolInfo, Worksheet } from '../../types';
 import { BoardBadge, StatusBadge } from '../../components/Bits';
 import TaskContentView from '../../components/TaskContentView';
 import { EvaluationPanel, ToolFrame } from '../../components/AiTools';
@@ -18,6 +18,7 @@ interface WorkspaceResponse {
   task: Task;
   teacherName: string;
   submission: Submission | null;
+  versions?: SubmissionVersion[];
   ai: { enabled: boolean; skills: AiSkill[]; tools: ToolInfo[] };
 }
 
@@ -49,6 +50,7 @@ export default function StudentTaskWorkspace() {
   const [content, setContent] = useState('');
   const [worksheet, setWorksheet] = useState<Worksheet>({ stages: [], selfScores: [], gains: '', difficulties: '' });
   const [files, setFiles] = useState<FileInfo[]>([]);
+  const [versions, setVersions] = useState<SubmissionVersion[]>([]);
   const [tab, setTab] = useState<'submit' | 'ai'>('submit');
   const [guide, setGuide] = useState<AiGuide | null>(null);
   const [selectedSkill, setSelectedSkill] = useState('');
@@ -71,6 +73,7 @@ export default function StudentTaskWorkspace() {
         setContent(result.submission?.content || '');
         setWorksheet(mergeWorksheet(result.submission?.worksheet, result.task));
         setFiles(result.submission?.files || []);
+        setVersions(result.versions || []);
         if (result.ai.skills.length > 0) setSelectedSkill(result.ai.skills[0].key);
         if (result.ai.tools && result.ai.tools.length > 0) setSelectedTool(result.ai.tools[0].key);
       } catch (err: any) {
@@ -92,11 +95,12 @@ export default function StudentTaskWorkspace() {
     setMessage('');
     setSaving(true);
     try {
-      const result = await api<{ submission: Submission; message: string }>(
+      const result = await api<{ submission: Submission; versions?: SubmissionVersion[]; message: string }>(
         `/student/assignments/${assignmentId}/submission`,
         { method: 'PUT', body: { content, worksheet, files, submit } },
       );
-      setData({ ...data, submission: result.submission });
+      setData({ ...data, submission: result.submission, versions: result.versions || data.versions });
+      setVersions(result.versions || []);
       setMessage(result.message);
     } catch (err: any) {
       setError(err.message || '保存失败');
@@ -218,7 +222,7 @@ export default function StudentTaskWorkspace() {
               <BoardBadge board={task.board} />
               <StatusBadge
                 status={
-                  graded ? 'graded' : submission?.status === 'submitted' ? 'submitted' : submission?.status === 'draft' ? 'draft' : 'pending'
+                  graded ? 'graded' : submission?.status === 'submitted' ? 'submitted' : submission?.status === 'returned' ? 'returned' : submission?.status === 'draft' ? 'draft' : 'pending'
                 }
               />
             </div>
@@ -234,6 +238,14 @@ export default function StudentTaskWorkspace() {
               {assignment.dueAt && <span>截止日期：{formatDate(assignment.dueAt)}</span>}
             </div>
           </div>
+
+          {submission?.status === 'returned' && (
+            <div className="alert info" style={{ marginBottom: 14 }}>
+              <strong>教师退回了你的成果</strong>
+              {submission.returnedAt ? `（${formatDateTime(submission.returnedAt)}）` : ''}，请按修改建议调整后重新提交。
+              {submission.returnNote && <div style={{ marginTop: 6 }}>修改建议：{submission.returnNote}</div>}
+            </div>
+          )}
 
           <TaskContentView content={task.content} />
 
@@ -460,15 +472,17 @@ export default function StudentTaskWorkspace() {
             <div className="submission-status">
               <StatusBadge
                 status={
-                  graded ? 'graded' : submission?.status === 'submitted' ? 'submitted' : submission?.status === 'draft' ? 'draft' : 'pending'
+                  graded ? 'graded' : submission?.status === 'submitted' ? 'submitted' : submission?.status === 'returned' ? 'returned' : submission?.status === 'draft' ? 'draft' : 'pending'
                 }
               />
               <span>
                 {graded
                   ? `教师已批阅 · ${formatDateTime(submission?.gradedAt)}`
-                  : submission?.status === 'submitted'
-                    ? `已提交 · ${formatDateTime(submission?.submittedAt)}`
-                    : '提交后教师即可查看并批阅'}
+                  : submission?.status === 'returned'
+                    ? `已退回修改 · ${formatDateTime(submission?.returnedAt)}，可修改后重新提交`
+                    : submission?.status === 'submitted'
+                      ? `已提交 · ${formatDateTime(submission?.submittedAt)}`
+                      : '提交后教师即可查看并批阅'}
               </span>
             </div>
 
@@ -480,7 +494,11 @@ export default function StudentTaskWorkspace() {
                   {saving ? '保存中…' : '保存草稿'}
                 </button>
                 <button className="primary-btn" type="button" onClick={() => saveSubmission(true)} disabled={saving}>
-                  {submission?.status === 'submitted' ? '更新提交' : '提交成果'}
+                  {submission?.status === 'submitted'
+                    ? '更新提交'
+                    : submission?.status === 'returned'
+                      ? '重新提交'
+                      : '提交成果'}
                 </button>
               </div>
             )}
@@ -492,6 +510,17 @@ export default function StudentTaskWorkspace() {
                   <strong>{submission?.score ?? '—'}</strong>
                   <span>分</span>
                 </div>
+                {(submission?.criteriaScores || []).length > 0 && (
+                  <div className="criteria-feedback">
+                    {(submission?.criteriaScores || []).map((item) => (
+                      <div className="criteria-feedback-row" key={item.name}>
+                        <span className="criteria-feedback-name">{item.name}</span>
+                        <strong>{item.score}</strong>
+                        {item.comment && <span className="muted small-text">· {item.comment}</span>}
+                      </div>
+                    ))}
+                  </div>
+                )}
                 {submission?.feedback ? (
                   <p style={{ whiteSpace: 'pre-wrap', fontSize: 13.5, color: '#4a546b' }}>{submission.feedback}</p>
                 ) : (
@@ -517,10 +546,10 @@ export default function StudentTaskWorkspace() {
               <div className="submission-status">
                 <StatusBadge
                   status={
-                    graded ? 'graded' : submission?.status === 'submitted' ? 'submitted' : submission?.status === 'draft' ? 'draft' : 'pending'
+                    graded ? 'graded' : submission?.status === 'submitted' ? 'submitted' : submission?.status === 'returned' ? 'returned' : submission?.status === 'draft' ? 'draft' : 'pending'
                   }
                 />
-                <span>{graded ? '已批阅' : submission?.status === 'submitted' ? '等待批阅' : '未提交'}</span>
+                <span>{graded ? '已批阅' : submission?.status === 'submitted' ? '等待批阅' : submission?.status === 'returned' ? '退回修改' : '未提交'}</span>
               </div>
               <p className="muted small-text">作答区在左侧任务单下方，可按阶段填写表格、自评与反思。</p>
               <ul className="side-check">
@@ -528,6 +557,16 @@ export default function StudentTaskWorkspace() {
                 <li>{files.length > 0 ? `✓ 已上传 ${files.length} 个附件` : '○ 尚未上传附件'}</li>
                 <li>{worksheet.selfScores.some(Boolean) ? '✓ 已完成自我评价' : '○ 尚未完成自我评价'}</li>
               </ul>
+              {versions.length > 0 && (
+                <div className="version-list">
+                  <span className="muted small-text">提交记录：</span>
+                  {versions.map((version) => (
+                    <span className="version-chip" key={version.id}>
+                      V{version.versionNo} · {formatDateTime(version.createdAt)}
+                    </span>
+                  ))}
+                </div>
+              )}
               {graded && (
                 <div className="feedback-box">
                   <h3>教师评价</h3>

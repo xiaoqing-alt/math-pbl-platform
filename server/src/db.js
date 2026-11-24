@@ -128,6 +128,19 @@ CREATE TABLE IF NOT EXISTS upload_files (
 );
 
 CREATE INDEX IF NOT EXISTS idx_upload_files_user ON upload_files (user_id);
+
+CREATE TABLE IF NOT EXISTS submission_versions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  submission_id INTEGER NOT NULL,
+  version_no INTEGER NOT NULL,
+  content TEXT NOT NULL DEFAULT '',
+  worksheet TEXT NOT NULL DEFAULT '{}',
+  files TEXT NOT NULL DEFAULT '[]',
+  created_at TEXT NOT NULL,
+  UNIQUE (submission_id, version_no)
+);
+
+CREATE INDEX IF NOT EXISTS idx_versions_submission ON submission_versions (submission_id);
 `);
 
 const submissionColumns = db.prepare('PRAGMA table_info(submissions)').all();
@@ -138,6 +151,17 @@ if (!submissionColumns.some((column) => column.name === 'worksheet')) {
 const toolColumns = db.prepare('PRAGMA table_info(tools)').all();
 if (!toolColumns.some((column) => column.name === 'category')) {
   db.exec("ALTER TABLE tools ADD COLUMN category TEXT NOT NULL DEFAULT 'assist'");
+}
+
+const latestSubmissionColumns = db.prepare('PRAGMA table_info(submissions)').all();
+if (!latestSubmissionColumns.some((column) => column.name === 'criteria_scores')) {
+  db.exec("ALTER TABLE submissions ADD COLUMN criteria_scores TEXT NOT NULL DEFAULT '[]'");
+}
+if (!latestSubmissionColumns.some((column) => column.name === 'returned_at')) {
+  db.exec("ALTER TABLE submissions ADD COLUMN returned_at TEXT DEFAULT ''");
+}
+if (!latestSubmissionColumns.some((column) => column.name === 'return_note')) {
+  db.exec("ALTER TABLE submissions ADD COLUMN return_note TEXT DEFAULT ''");
 }
 
 export const BOARD_NAMES = {
@@ -288,6 +312,9 @@ export function serializeSubmission(row) {
     score: row.score === null || row.score === undefined ? null : Number(row.score),
     feedback: row.feedback || '',
     gradedAt: row.graded_at || '',
+    criteriaScores: parseJson(row.criteria_scores, []),
+    returnedAt: row.returned_at || '',
+    returnNote: row.return_note || '',
     updatedAt: row.updated_at,
     studentName: row.student_name || '',
     username: row.username || '',

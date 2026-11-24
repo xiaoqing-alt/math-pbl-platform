@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api, formatDate, formatDateTime, fileUrl } from '../../api';
-import type { ClassReport, Submission, Task } from '../../types';
+import type { ClassReport, CriteriaScore, Submission, SubmissionVersion, Task } from '../../types';
 import { BoardBadge, EmptyState, StatusBadge } from '../../components/Bits';
 import ReportView from '../../components/ReportView';
+import MathText from '../../components/MathText';
 
 interface StudentRow {
   id: number;
@@ -11,11 +12,12 @@ interface StudentRow {
   displayName: string;
   submission: null | {
     id: number;
-    status: 'draft' | 'submitted';
+    status: 'draft' | 'submitted' | 'returned';
     submittedAt: string;
     updatedAt: string;
     score: number | null;
     gradedAt: string;
+    returned: boolean;
     hasFeedback: boolean;
     wordCount: number;
     fileCount: number;
@@ -43,6 +45,7 @@ interface SubmissionDetailResponse {
   submission: Submission;
   student: { id: number; username: string; displayName: string };
   task: { id: number; title: string; content: Task['content'] };
+  versions: SubmissionVersion[];
   assignmentStatus: string;
 }
 
@@ -54,6 +57,8 @@ export default function Grading() {
   const [submissionDetail, setSubmissionDetail] = useState<SubmissionDetailResponse | null>(null);
   const [scoreInput, setScoreInput] = useState('');
   const [feedbackInput, setFeedbackInput] = useState('');
+  const [criteriaInput, setCriteriaInput] = useState<Record<string, { score: string; comment: string }>>({});
+  const [versions, setVersions] = useState<SubmissionVersion[]>([]);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [report, setReport] = useState<ClassReport | null>(null);
@@ -82,13 +87,30 @@ export default function Grading() {
     setError('');
     setScoreInput('');
     setFeedbackInput('');
+    setCriteriaInput({});
+    setVersions([]);
     setSubmissionDetail(null);
     if (!student.submission) return;
     try {
       const data = await api<SubmissionDetailResponse>(`/submissions/${student.submission.id}`);
       setSubmissionDetail(data);
+      setVersions(data.versions || []);
       setScoreInput(data.submission.score === null ? '' : String(data.submission.score));
       setFeedbackInput(data.submission.feedback || '');
+      const criteria = data.task.content?.criteria || [];
+      const saved = new Map((data.submission.criteriaScores || []).map((item) => [item.name, item]));
+      const suggested = new Map(
+        (data.submission.analysis?.dimensions || []).map((item) => [item.name, item.score]),
+      );
+      const next: Record<string, { score: string; comment: string }> = {};
+      for (const item of criteria) {
+        const entry = saved.get(item.name);
+        next[item.name] = {
+          score: entry ? String(entry.score) : suggested.has(item.name) ? String(suggested.get(item.name)) : '',
+          comment: entry ? entry.comment : '',
+        };
+      }
+      setCriteriaInput(next);
     } catch (err: any) {
       setError(err.message || '加载成果失败');
     }
@@ -99,11 +121,22 @@ export default function Grading() {
     setError('');
     setMessage('');
     try {
+      const criteriaScores = criteriaList
+        .map((item) => ({
+          name: item.name,
+          score: Number(criteriaInput[item.name]?.score),
+          comment: criteriaInput[item.name]?.comment || '',
+        }))
+        .filter((item) => criteriaInput[item.name] && criteriaInput[item.name].score !== '' && Number.isFinite(item.score));
       const data = await api<{ submission: Submission; message: string }>(
         `/submissions/${submissionDetail.submission.id}`,
         {
           method: 'PATCH',
-          body: { score: scoreInput === '' ? null : Number(scoreInput), feedback: feedbackInput },
+          body: {
+            score: scoreInput === '' ? null : Number(scoreInput),
+            feedback: feedbackInput,
+            criteriaScores,
+          },
         },
       );
       setSubmissionDetail({ ...submissionDetail, submission: data.submission });
@@ -112,6 +145,35 @@ export default function Grading() {
     } catch (err: any) {
       setError(err.message || '保存批阅失败');
     }
+  }
+
+  async function returnForRevision() {
+    if (!submissionDetail) return;
+    if (!feedbackInput.trim()) {
+      setError('请先填写退回原因或修改建议，学生端会看到这段说明');
+      return;
+    }
+    if (!window.confirm('确定把这份成果退回给学生修改吗？学生可修改后重新提交。')) return;
+    setError('');
+    setMessage('');
+    try {
+      const data = await api<{ submission: Submission; message: string }>(
+        `/submissions/${submissionDetail.submission.id}`,
+        { method: 'PATCH', body: { action: 'return', feedback: feedbackInput } },
+      );
+      setSubmissionDetail({ ...submissionDetail, submission: data.submission });
+      setMessage(data.message);
+      await load();
+    } catch (err: any) {
+      setError(err.message || '退回失败');
+    }
+  }
+
+  function updateCriterion(name: string, patch: Partial<{ score: string; comment: string }>) {
+    setCriteriaInput((current) => ({
+      ...current,
+      [name]: { score: '', comment: '', ...(current[name] || {}), ...patch },
+    }));
   }
 
   function applyAiSuggestion() {
@@ -157,6 +219,21 @@ export default function Grading() {
 
   const selectedStudent = detail.students.find((item) => item.id === selectedId) || null;
   const analysis = submissionDetail?.submission.analysis || null;
+  const criteriaList = detail.task.content.criteria || [];
+  const weightedPreview = (() => {
+    if (criteriaList.length === 0) return null;
+    let sum = 0;
+    let total = 0;
+    for (const item of criteriaList) {
+      const raw = criteriaInput[item.name]?.score;
+      const value = Number(raw);
+      if (raw === undefined || raw === '' || !Number.isFinite(value)) return null;
+      const weight = item.weight || 1;
+      sum += value * weight;
+      total += weight;
+    }
+    return total > 0 ? Math.round((sum / total) * 10) / 10 : null;
+  })();
 
   return (
     <div>
@@ -203,13 +280,17 @@ export default function Grading() {
                   <small>
                     {student.submission?.status === 'submitted'
                       ? `提交于 ${formatDate(student.submission.submittedAt)}`
-                      : student.submission?.status === 'draft'
-                        ? '仅有草稿'
-                        : '尚未提交'}
+                      : student.submission?.status === 'returned'
+                        ? '已退回待修改'
+                        : student.submission?.status === 'draft'
+                          ? '仅有草稿'
+                          : '尚未提交'}
                     {student.submission?.gradedAt ? ` · 已批阅` : ''}
                   </small>
                 </div>
-                {student.submission?.score !== null && student.submission?.score !== undefined ? (
+                {student.submission?.status === 'returned' ? (
+                  <span className="status-badge returned">退回中</span>
+                ) : student.submission?.score !== null && student.submission?.score !== undefined ? (
                   <span className="status-badge graded">{student.submission.score}分</span>
                 ) : student.submission?.status === 'submitted' ? (
                   <span className="status-badge submitted">待批阅</span>
@@ -241,7 +322,15 @@ export default function Grading() {
                   {submissionDetail.student.displayName} 的成果
                 </h2>
                 <div className="list-meta">
-                  <StatusBadge status={submissionDetail.submission.gradedAt ? 'graded' : 'submitted'} />
+                  <StatusBadge
+                    status={
+                      submissionDetail.submission.status === 'returned'
+                        ? 'returned'
+                        : submissionDetail.submission.gradedAt
+                          ? 'graded'
+                          : 'submitted'
+                    }
+                  />
                   <span className="muted small-text">
                     {submissionDetail.submission.submittedAt
                       ? formatDateTime(submissionDetail.submission.submittedAt)
@@ -250,8 +339,31 @@ export default function Grading() {
                 </div>
               </div>
 
+              {submissionDetail.submission.status === 'returned' && (
+                <div className="alert info">
+                  已退回修改（{formatDateTime(submissionDetail.submission.returnedAt)}），等待学生重新提交。
+                  {submissionDetail.submission.returnNote && (
+                    <div style={{ marginTop: 6 }}>退回说明：{submissionDetail.submission.returnNote}</div>
+                  )}
+                </div>
+              )}
+
+              {versions.length > 1 && (
+                <div className="version-list">
+                  <span className="muted small-text">提交版本：</span>
+                  {versions.map((version) => (
+                    <span className="version-chip" key={version.id}>
+                      V{version.versionNo} · {formatDateTime(version.createdAt)} · {version.wordCount}字
+                      {version.fileCount > 0 ? ` · ${version.fileCount}个附件` : ''}
+                    </span>
+                  ))}
+                </div>
+              )}
+
               {submissionDetail.submission.content ? (
-                <div className="content-box">{submissionDetail.submission.content}</div>
+                <div className="content-box">
+                  <MathText text={submissionDetail.submission.content} />
+                </div>
               ) : (
                 <p className="muted small-text">学生没有填写文字成果，请查看附件。</p>
               )}
@@ -310,7 +422,11 @@ export default function Grading() {
                             </table>
                           </div>
                         )}
-                        {answer.text.trim() && <p className="review-text">{answer.text}</p>}
+                        {answer.text.trim() && (
+                          <p className="review-text">
+                            <MathText text={answer.text} />
+                          </p>
+                        )}
                       </div>
                     );
                   })}
@@ -392,9 +508,55 @@ export default function Grading() {
                 </div>
               )}
 
+              {criteriaList.length > 0 && (
+                <div className="criteria-grade">
+                  <div className="section-title" style={{ marginBottom: 6 }}>
+                    <h3>分维度评分</h3>
+                    <span className="muted small-text">依据任务单评价标准与权重</span>
+                  </div>
+                  {criteriaList.map((item) => (
+                    <div className="criteria-grade-row" key={item.name}>
+                      <div className="criteria-grade-head">
+                        <strong>
+                          <MathText text={item.name} />
+                        </strong>
+                        <span className="muted small-text">{item.weight ? `权重 ${item.weight}%` : '未设权重'}</span>
+                      </div>
+                      {item.description && (
+                        <p className="muted small-text">
+                          <MathText text={item.description} />
+                        </p>
+                      )}
+                      <div className="criteria-grade-inputs">
+                        <input
+                          type="number"
+                          min={0}
+                          max={100}
+                          value={criteriaInput[item.name]?.score ?? ''}
+                          placeholder="0—100"
+                          onChange={(event) => updateCriterion(item.name, { score: event.target.value })}
+                        />
+                        <input
+                          type="text"
+                          className="criteria-comment"
+                          value={criteriaInput[item.name]?.comment ?? ''}
+                          placeholder="该维度的简评（可选）"
+                          onChange={(event) => updateCriterion(item.name, { comment: event.target.value })}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                  {weightedPreview !== null && (
+                    <p className="small-text" style={{ marginTop: 8 }}>
+                      按当前维度分与权重计算：<strong>{weightedPreview}</strong> 分
+                    </p>
+                  )}
+                </div>
+              )}
+
               <div className="grade-form">
                 <label className="field">
-                  <span>评分（0—100）</span>
+                  <span>总分（留空则按维度权重自动计算）</span>
                   <input
                     type="number"
                     min={0}
@@ -415,11 +577,18 @@ export default function Grading() {
                 </label>
               </div>
 
-              <div className="editor-actions">
-                <button className="primary-btn" type="button" onClick={saveGrade}>
-                  保存批阅
-                </button>
-              </div>
+              {submissionDetail.submission.status === 'returned' ? (
+                <p className="muted small-text">已退回，学生重新提交后即可再次批阅。</p>
+              ) : (
+                <div className="editor-actions">
+                  <button className="outline-btn" type="button" onClick={returnForRevision}>
+                    退回修改
+                  </button>
+                  <button className="primary-btn" type="button" onClick={saveGrade}>
+                    保存批阅
+                  </button>
+                </div>
+              )}
             </>
           )}
         </div>

@@ -20,6 +20,21 @@ function parseId(value) {
   return Number.isInteger(n) && n > 0 ? n : null;
 }
 
+function listVersionSummaries(submissionId) {
+  return db
+    .prepare(
+      'SELECT id, version_no, content, files, created_at FROM submission_versions WHERE submission_id = ? ORDER BY version_no DESC',
+    )
+    .all(submissionId)
+    .map((row) => ({
+      id: Number(row.id),
+      versionNo: Number(row.version_no),
+      createdAt: row.created_at,
+      wordCount: Array.from(String(row.content || '').replace(/\s/g, '')).length,
+      fileCount: JSON.parse(row.files || '[]').length,
+    }));
+}
+
 function getStudentAssignment(assignmentId, studentId) {
   return db
     .prepare(
@@ -62,7 +77,9 @@ router.get('/summary', (req, res) => {
     )
     .all(req.user.id, req.user.id);
 
-  const pending = assignmentRows.filter((item) => !item.submission_status || item.submission_status === 'draft').length;
+  const pending = assignmentRows.filter(
+    (item) => !item.submission_status || item.submission_status === 'draft' || item.submission_status === 'returned',
+  ).length;
   const submitted = assignmentRows.filter((item) => item.submission_status === 'submitted').length;
   const graded = assignmentRows.filter((item) => item.graded_at).length;
 
@@ -163,6 +180,7 @@ router.get('/assignments/:id', (req, res) => {
     task,
     teacherName: row.teacher_name,
     submission,
+    versions: submissionRow ? listVersionSummaries(submissionRow.id) : [],
     ai: {
       enabled: task.aiEnabled,
       skills: enabledSkills,
@@ -227,16 +245,30 @@ router.put('/assignments/:id/submission', (req, res) => {
   const worksheetJson = JSON.stringify(worksheet);
   const analysisJson = analysis ? JSON.stringify(analysis) : '';
 
+  let submissionId = existing ? Number(existing.id) : 0;
   if (existing) {
     db.prepare(
       `UPDATE submissions SET content = ?, worksheet = ?, files = ?, status = ?, analysis = ?, submitted_at = ?, updated_at = ?
        WHERE id = ?`,
     ).run(content, worksheetJson, filesJson, status, analysisJson, submittedAt, now, existing.id);
   } else {
-    db.prepare(
+    const inserted = db.prepare(
       `INSERT INTO submissions (assignment_id, student_id, content, worksheet, files, status, analysis, submitted_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(assignmentId, req.user.id, content, worksheetJson, filesJson, status, analysisJson, submittedAt, now);
+    submissionId = Number(inserted.lastInsertRowid);
+  }
+
+  // 每次正式提交都留存一个版本，便于教师追溯修改过程
+  if (submit) {
+    const latest = db
+      .prepare('SELECT MAX(version_no) AS version_no FROM submission_versions WHERE submission_id = ?')
+      .get(submissionId);
+    const nextVersion = Number((latest && latest.version_no) || 0) + 1;
+    db.prepare(
+      `INSERT INTO submission_versions (submission_id, version_no, content, worksheet, files, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    ).run(submissionId, nextVersion, content, worksheetJson, filesJson, now);
   }
 
   const saved = db
@@ -247,9 +279,15 @@ router.put('/assignments/:id/submission', (req, res) => {
     )
     .get(assignmentId, req.user.id);
 
+  const resubmitted = submit && existing && existing.status === 'returned';
   res.json({
     submission: serializeSubmission(saved),
-    message: submit ? '成果已提交，教师端可以查看并批阅' : '草稿已保存',
+    versions: listVersionSummaries(submissionId),
+    message: submit
+      ? resubmitted
+        ? '已按教师建议重新提交，教师端可以查看新版本'
+        : '成果已提交，教师端可以查看并批阅'
+      : '草稿已保存',
   });
 });
 
