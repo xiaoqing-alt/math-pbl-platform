@@ -220,6 +220,9 @@ export default function Grading() {
   const selectedStudent = detail.students.find((item) => item.id === selectedId) || null;
   const analysis = submissionDetail?.submission.analysis || null;
   const criteriaList = detail.task.content.criteria || [];
+  const aiScoreMap = new Map(
+    (submissionDetail?.submission.aiCriteriaScores || []).map((item) => [item.name, item]),
+  );
   const weightedPreview = (() => {
     if (criteriaList.length === 0) return null;
     let sum = 0;
@@ -544,6 +547,12 @@ export default function Grading() {
                           onChange={(event) => updateCriterion(item.name, { comment: event.target.value })}
                         />
                       </div>
+                      {aiScoreMap.has(item.name) && (
+                        <p className="ai-hint">
+                          AI 建议 {aiScoreMap.get(item.name)!.score} 分
+                          {aiScoreMap.get(item.name)!.reason ? ` · ${aiScoreMap.get(item.name)!.reason}` : ''}
+                        </p>
+                      )}
                     </div>
                   ))}
                   {weightedPreview !== null && (

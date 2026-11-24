@@ -299,6 +299,7 @@ export function serializeTask(row) {
 
 export function serializeSubmission(row) {
   if (!row) return null;
+  const analysis = parseJson(row.analysis, null);
   return {
     id: Number(row.id),
     assignmentId: Number(row.assignment_id),
@@ -307,7 +308,16 @@ export function serializeSubmission(row) {
     worksheet: normalizeWorksheet(parseJson(row.worksheet, {})),
     files: parseJson(row.files, []),
     status: row.status,
-    analysis: parseJson(row.analysis, null),
+    analysis,
+    aiCriteriaScores:
+      analysis && Array.isArray(analysis.dimensions)
+        ? analysis.dimensions.map((item) => ({
+            name: item.name,
+            score: Number(item.score) || 0,
+            weight: Number(item.weight) || 0,
+            reason: item.reason || '',
+          }))
+        : [],
     submittedAt: row.submitted_at || '',
     score: row.score === null || row.score === undefined ? null : Number(row.score),
     feedback: row.feedback || '',

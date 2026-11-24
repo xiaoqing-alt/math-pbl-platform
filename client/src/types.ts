@@ -152,6 +152,8 @@ export interface DimensionScore {
   score: number;
   weight?: number;
   weightPercent?: number;
+  reason?: string;
+  evidence?: string[];
 }
 
 export interface Analysis {
@@ -163,6 +165,7 @@ export interface Analysis {
   fileCount: number;
   flags: Record<string, boolean>;
   dimensions: DimensionScore[];
+  ruleFacts?: string[];
   strengths: string[];
   improvements: string[];
   note: string;
@@ -192,6 +195,7 @@ export interface Submission {
   files: FileInfo[];
   status: 'draft' | 'submitted' | 'returned';
   analysis: Analysis | null;
+  aiCriteriaScores: DimensionScore[];
   submittedAt: string;
   score: number | null;
   feedback: string;

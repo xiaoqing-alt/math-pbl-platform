@@ -21,6 +21,14 @@ function matchesSignal(text, signal) {
   return signal.test.test(text);
 }
 
+// 学生作答与上传内容都视为不可信输入：去掉零宽字符、HTML 标签并限制长度，避免影响规则判断
+export function sanitizeUntrustedText(value, maxLength = 20000) {
+  return String(value || '')
+    .replace(/[\u200b-\u200f\u202a-\u202e\ufeff]/g, '')
+    .replace(/<[^>]*>/g, ' ')
+    .slice(0, maxLength);
+}
+
 function criteriaSignal(criterion) {
   const text = `${criterion.name || ''}${criterion.description || ''}`;
   return SIGNAL_RULES.find((signal) => signal.keywords.some((kw) => text.includes(kw))) || null;
@@ -61,7 +69,7 @@ function worksheetStats(worksheet) {
 
 export function analyzeSubmission({ content, worksheet, files, criteria }) {
   const worksheetText = worksheetToText(worksheet);
-  const text = `${String(content || '')}\n${worksheetText}`;
+  const text = sanitizeUntrustedText(`${String(content || '')}\n${worksheetText}`);
   const stats = worksheetStats(worksheet);
   const charCount = countCharacters(text);
   const paragraphCount = countParagraphs(text);
@@ -104,16 +112,24 @@ export function analyzeSubmission({ content, worksheet, files, criteria }) {
     dimensions = normalizedCriteria.map((criterion) => {
       const weight = Number(criterion.weight) || 1;
       const signal = criteriaSignal(criterion);
+      const hitKeywords = signal ? signal.keywords.filter((kw) => text.includes(kw)) : [];
       let value = base;
       if (signal) {
-        value += matchesSignal(text, signal) ? 4 : -10;
+        value += hitKeywords.length > 0 ? 4 : -10;
       }
       value = Math.max(35, Math.min(100, Math.round(value)));
+      const reason = signal
+        ? hitKeywords.length > 0
+          ? `检测到“${hitKeywords.join('、')}”等证据，按任务单「${criterion.name}」维度加分`
+          : `未检测到与「${criterion.name}」直接相关的证据，建议补充对应内容`
+        : `按内容完整度（${charCount} 字）、结构、附件（${fileCount} 个）与阶段填写情况估算`;
       return {
         name: criterion.name,
         score: value,
         weight,
         weightPercent: Math.round((weight / totalWeight) * 100),
+        evidence: hitKeywords,
+        reason,
       };
     });
   } else {
@@ -184,7 +200,7 @@ export function analyzeSubmission({ content, worksheet, files, criteria }) {
   if (stats.selfRated > 0) strengths.push('完成了自我评价量表');
 
   return {
-    version: 'rules-v2',
+    version: 'rules-v3',
     generatedAt: new Date().toISOString(),
     suggestedScore: Math.max(0, Math.min(100, finalScore)),
     wordCount: charCount,
@@ -193,9 +209,17 @@ export function analyzeSubmission({ content, worksheet, files, criteria }) {
     worksheet: stats,
     flags,
     dimensions,
+    ruleFacts: [
+      `正文约 ${charCount} 字、${paragraphCount} 个段落`,
+      flags.data ? '包含数据或计算线索' : '未识别到数据或计算线索',
+      flags.chart ? '包含图表表达线索' : '未识别到图表表达线索',
+      flags.conclusion ? '包含结论或建议线索' : '未识别到结论或建议线索',
+      flags.reflection ? '包含反思或改进线索' : '未识别到反思线索',
+      `附件 ${fileCount} 个，阶段填写 ${stats.filledStages}/${stats.stageCount || 0}`,
+    ],
     strengths: strengths.slice(0, 4),
     improvements: improvements.slice(0, 4),
-    note: '本分析由平台基础规则自动生成，供教师批阅参考；接入大模型后可进行更深入的语义分析。',
+    note: '本分析由平台规则（rules-v3）生成：按任务单评价维度权重估算，并给出每个维度的依据；仅供教师批阅参考，教师终评可以逐项修改。',
   };
 }
 

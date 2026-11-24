@@ -70,14 +70,20 @@ export function EvaluationPanel({
           <div className="ai-eval-meta">
             共 {evaluation.wordCount} 字 · {evaluation.paragraphCount} 段 · {evaluation.fileCount} 个附件
           </div>
+          {evaluation.ruleFacts && evaluation.ruleFacts.length > 0 && (
+            <p className="ai-hint">规则依据：{evaluation.ruleFacts.join('；')}</p>
+          )}
           <h4>维度得分</h4>
           {evaluation.dimensions.map((dim) => (
-            <div className="dim-row" key={dim.name}>
-              <span>{dim.name}</span>
-              <div className="dim-track">
-                <div className="dim-fill" style={{ width: `${dim.score}%` }} />
+            <div className="dim-item" key={dim.name}>
+              <div className="dim-row">
+                <span>{dim.name}</span>
+                <div className="dim-track">
+                  <div className="dim-fill" style={{ width: `${dim.score}%` }} />
+                </div>
+                <strong>{dim.score}</strong>
               </div>
-              <strong>{dim.score}</strong>
+              {dim.reason && <p className="dim-reason">{dim.reason}</p>}
             </div>
           ))}
           {evaluation.strengths.length > 0 && (

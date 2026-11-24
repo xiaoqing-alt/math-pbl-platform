@@ -172,6 +172,11 @@ export default function ReportView({ report }: { report: ClassReport }) {
           </tbody>
         </table>
       </div>
+      <p className="rule-note">
+        评分说明：学生端的“自动分析建议分”由平台规则（rules-v3）估算，依据包括内容字数与结构、
+        数据/图表/结论/反思线索、附件数量与阶段填写情况，并按任务单的评价维度权重折算；
+        教师完成维度评分后，本报告的维度均分与平均分以教师评分为准。
+      </p>
     </div>
   );
 }

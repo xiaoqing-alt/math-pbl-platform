@@ -20,6 +20,22 @@ function parseId(value) {
   return Number.isInteger(n) && n > 0 ? n : null;
 }
 
+// AI 辅助为按用户计数的滑动窗口限流，避免脚本刷接口
+const aiUsage = new Map();
+function aiRateLimit(req, res, next) {
+  const now = Date.now();
+  const windowMs = 5 * 60 * 1000;
+  const limit = 30;
+  const key = Number(req.user.id);
+  const recent = (aiUsage.get(key) || []).filter((time) => now - time < windowMs);
+  if (recent.length >= limit) {
+    return res.status(429).json({ message: 'AI 辅助使用过于频繁，请稍后再试' });
+  }
+  recent.push(now);
+  aiUsage.set(key, recent);
+  next();
+}
+
 function listVersionSummaries(submissionId) {
   return db
     .prepare(
@@ -291,7 +307,7 @@ router.put('/assignments/:id/submission', (req, res) => {
   });
 });
 
-router.post('/assignments/:id/ai/guide', (req, res) => {
+router.post('/assignments/:id/ai/guide', aiRateLimit, (req, res) => {
   const assignmentId = parseId(req.params.id);
   if (!assignmentId) return res.status(400).json({ message: '任务编号无效' });
 
@@ -316,7 +332,7 @@ router.post('/assignments/:id/ai/guide', (req, res) => {
 });
 
 // AI 成果评价：对当前草稿做规则版评分与自检，未提交前即可反复使用
-router.post('/assignments/:id/ai/evaluate', (req, res) => {
+router.post('/assignments/:id/ai/evaluate', aiRateLimit, (req, res) => {
   const assignmentId = parseId(req.params.id);
   if (!assignmentId) return res.status(400).json({ message: '任务编号无效' });
 
