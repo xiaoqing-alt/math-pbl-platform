@@ -1,12 +1,12 @@
-import express from 'express';
 import multer from 'multer';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { db, UPLOAD_DIR } from '../db.js';
+import { createRouter } from '../asyncRouter.js';
 import { requireAuth } from '../auth.js';
 
-const router = express.Router();
+const router = createRouter();
 
 const ALLOWED_EXT = new Set([
   '.png',
@@ -107,7 +107,7 @@ function removeQuietly(filePath) {
   }
 }
 
-router.post('/', requireAuth, upload.single('file'), (req, res) => {
+router.post('/', requireAuth, upload.single('file'), async (req, res) => {
   if (!req.file) return res.status(400).json({ message: '请选择要上传的文件' });
 
   const ext = path.extname(req.file.filename).toLowerCase();
@@ -124,16 +124,16 @@ router.post('/', requireAuth, upload.single('file'), (req, res) => {
     return res.status(415).json({ message: '文件内容与扩展名不一致，已拒绝上传' });
   }
 
-  const used = db
+  const used = await db
     .prepare('SELECT COALESCE(SUM(size), 0) AS total FROM upload_files WHERE user_id = ?')
-    .get(req.user.id).total;
-  if (Number(used) + req.file.size > USER_QUOTA) {
+    .get(req.user.id);
+  if (Number(used.total) + req.file.size > USER_QUOTA) {
     removeQuietly(req.file.path);
     return res.status(413).json({ message: '附件空间已用完（每人 100MB），请先删除部分历史附件' });
   }
 
   const originalName = decodeFileName(req.file.originalname);
-  db.prepare(
+  await db.prepare(
     'INSERT INTO upload_files (user_id, file_name, original_name, size, created_at) VALUES (?, ?, ?, ?, ?)',
   ).run(req.user.id, req.file.filename, originalName, req.file.size, new Date().toISOString());
 

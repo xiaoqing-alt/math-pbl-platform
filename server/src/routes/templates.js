@@ -1,8 +1,8 @@
-import express from 'express';
 import { db, BOARD_NAMES, isBoard, parseJson, normalizeContent, serializeTask } from '../db.js';
+import { createRouter } from '../asyncRouter.js';
 import { requireAuth, requireRole } from '../auth.js';
 
-const router = express.Router();
+const router = createRouter();
 
 router.use(requireAuth);
 
@@ -22,28 +22,28 @@ function serializeTemplate(row) {
   };
 }
 
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   const board = String(req.query.board || '').trim();
   let rows;
   if (board && isBoard(board)) {
-    rows = db.prepare('SELECT * FROM templates WHERE board = ? ORDER BY id').all(board);
+    rows = await db.prepare('SELECT * FROM templates WHERE board = ? ORDER BY id').all(board);
   } else {
-    rows = db.prepare('SELECT * FROM templates ORDER BY id').all();
+    rows = await db.prepare('SELECT * FROM templates ORDER BY id').all();
   }
   res.json({ templates: rows.map(serializeTemplate) });
 });
 
-router.get('/:id', (req, res) => {
+router.get('/:id', async (req, res) => {
   const id = Number(req.params.id);
-  const row = Number.isInteger(id) ? db.prepare('SELECT * FROM templates WHERE id = ?').get(id) : null;
+  const row = Number.isInteger(id) ? await db.prepare('SELECT * FROM templates WHERE id = ?').get(id) : null;
   if (!row) return res.status(404).json({ message: '模板不存在' });
   res.json({ template: serializeTemplate(row) });
 });
 
-router.post('/:id/copy', requireRole('teacher'), (req, res) => {
+router.post('/:id/copy', requireRole('teacher'), async (req, res) => {
   const id = Number(req.params.id);
   const template = Number.isInteger(id)
-    ? db.prepare('SELECT * FROM templates WHERE id = ?').get(id)
+    ? await db.prepare('SELECT * FROM templates WHERE id = ?').get(id)
     : null;
   if (!template) return res.status(404).json({ message: '模板不存在或已被移除' });
 
@@ -51,12 +51,12 @@ router.post('/:id/copy', requireRole('teacher'), (req, res) => {
   const now = new Date().toISOString();
   const content = normalizeContent(parseJson(template.content, {}));
 
-  const result = db
+  const inserted = await db
     .prepare(
       `INSERT INTO tasks (teacher_id, template_id, board, title, project_type, grade, duration, summary, cover_image, content, ai_enabled, ai_skills, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, '[]', ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, '[]', ?, ?) RETURNING id`,
     )
-    .run(
+    .get(
       req.user.id,
       Number(template.id),
       template.board,
@@ -71,7 +71,7 @@ router.post('/:id/copy', requireRole('teacher'), (req, res) => {
       now,
     );
 
-  const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(result.lastInsertRowid);
+  const task = await db.prepare('SELECT * FROM tasks WHERE id = ?').get(inserted.id);
   res.status(201).json({
     task: serializeTask(task),
     message: '已复制为你的独立任务单，原始官方模板保持不变',

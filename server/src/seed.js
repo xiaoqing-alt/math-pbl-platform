@@ -1,101 +1,113 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { db } from './db.js';
+import { db, get, run, initSchema } from './db.js';
 import { hashPassword } from './auth.js';
 import { TEMPLATE_SEED } from './templateData.js';
 import { TOOL_SEED } from './toolData.js';
 
-function ensureUser({ role, username, password, displayName }) {
-  const existing = db.prepare('SELECT id FROM users WHERE username = ?').get(username);
-  if (existing) return Number(existing.id);
-  const result = db
-    .prepare('INSERT INTO users (role, username, password, display_name, created_at) VALUES (?, ?, ?, ?, ?)')
-    .run(role, username, hashPassword(password), displayName, new Date().toISOString());
-  return Number(result.lastInsertRowid);
+async function insertReturningId(sql, params) {
+  const row = await get(`${sql} RETURNING id`, params);
+  return row ? Number(row.id) : null;
 }
 
-function ensureTemplate(template) {
-  const existing = db
-    .prepare('SELECT id FROM templates WHERE board = ? AND title = ?')
-    .get(template.board, template.title);
-  if (existing) return;
-  db.prepare(
-    `INSERT INTO templates (board, title, project_type, grade, duration, summary, cover_image, content, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).run(
-    template.board,
-    template.title,
-    template.projectType || '',
-    template.grade || '',
-    template.duration || '',
-    template.summary || '',
-    template.coverImage || '',
-    JSON.stringify(template.content || {}),
-    new Date().toISOString(),
+async function ensureUser({ role, username, password, displayName }) {
+  const existing = await db.prepare('SELECT id FROM users WHERE username = ?').get(username);
+  if (existing) return Number(existing.id);
+  return insertReturningId(
+    'INSERT INTO users (role, username, password, display_name, created_at) VALUES (?, ?, ?, ?, ?)',
+    [role, username, hashPassword(password), displayName, new Date().toISOString()],
   );
 }
 
-function ensureClass(teacherId, name, grade, studentIds) {
-  let row = db.prepare('SELECT id FROM classes WHERE teacher_id = ? AND name = ?').get(teacherId, name);
+async function ensureTemplate(template) {
+  const existing = await db
+    .prepare('SELECT id FROM templates WHERE board = ? AND title = ?')
+    .get(template.board, template.title);
+  if (existing) return;
+  await db
+    .prepare(
+      `INSERT INTO templates (board, title, project_type, grade, duration, summary, cover_image, content, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .run(
+      template.board,
+      template.title,
+      template.projectType || '',
+      template.grade || '',
+      template.duration || '',
+      template.summary || '',
+      template.coverImage || '',
+      JSON.stringify(template.content || {}),
+      new Date().toISOString(),
+    );
+}
+
+async function ensureClass(teacherId, name, grade, studentIds) {
+  let row = await db
+    .prepare('SELECT id FROM classes WHERE teacher_id = ? AND name = ?')
+    .get(teacherId, name);
   if (!row) {
-    const result = db
-      .prepare('INSERT INTO classes (teacher_id, name, grade, created_at) VALUES (?, ?, ?, ?)')
-      .run(teacherId, name, grade, new Date().toISOString());
-    row = { id: result.lastInsertRowid };
+    const id = await insertReturningId(
+      'INSERT INTO classes (teacher_id, name, grade, created_at) VALUES (?, ?, ?, ?)',
+      [teacherId, name, grade, new Date().toISOString()],
+    );
+    row = { id };
   }
   const classId = Number(row.id);
   for (const studentId of studentIds) {
-    const exists = db
+    const exists = await db
       .prepare('SELECT id FROM class_members WHERE class_id = ? AND student_id = ?')
       .get(classId, studentId);
     if (!exists) {
-      db.prepare('INSERT INTO class_members (class_id, student_id, joined_at) VALUES (?, ?, ?)').run(
-        classId,
-        studentId,
-        new Date().toISOString(),
-      );
+      await db
+        .prepare('INSERT INTO class_members (class_id, student_id, joined_at) VALUES (?, ?, ?)')
+        .run(classId, studentId, new Date().toISOString());
     }
   }
   return classId;
 }
 
-function ensureTool(tool) {
-  const existing = db.prepare('SELECT id FROM tools WHERE tool_key = ?').get(tool.key);
+async function ensureTool(tool) {
+  const existing = await db.prepare('SELECT id FROM tools WHERE tool_key = ?').get(tool.key);
   const category = tool.category === 'inquiry' ? 'inquiry' : 'assist';
   if (existing) {
-    db.prepare('UPDATE tools SET name = ?, description = ?, boards = ?, file_name = ?, category = ? WHERE id = ?').run(
+    await db
+      .prepare('UPDATE tools SET name = ?, description = ?, boards = ?, file_name = ?, category = ? WHERE id = ?')
+      .run(
+        tool.name,
+        tool.description || '',
+        JSON.stringify(tool.boards || []),
+        tool.fileName,
+        category,
+        existing.id,
+      );
+    return;
+  }
+  await db
+    .prepare(
+      `INSERT INTO tools (tool_key, owner_id, name, description, boards, file_name, builtin, category, created_at)
+       VALUES (?, NULL, ?, ?, ?, ?, 1, ?, ?)`,
+    )
+    .run(
+      tool.key,
       tool.name,
       tool.description || '',
       JSON.stringify(tool.boards || []),
       tool.fileName,
       category,
-      existing.id,
+      new Date().toISOString(),
     );
-    return;
-  }
-  db.prepare(
-    `INSERT INTO tools (tool_key, owner_id, name, description, boards, file_name, builtin, category, created_at)
-     VALUES (?, NULL, ?, ?, ?, ?, 1, ?, ?)`,
-  ).run(
-    tool.key,
-    tool.name,
-    tool.description || '',
-    JSON.stringify(tool.boards || []),
-    tool.fileName,
-    category,
-    new Date().toISOString(),
-  );
 }
 
-export function runSeed() {
+export async function runSeed() {
   for (const template of TEMPLATE_SEED) {
-    ensureTemplate(template);
+    await ensureTemplate(template);
   }
   for (const tool of TOOL_SEED) {
-    ensureTool(tool);
+    await ensureTool(tool);
   }
 
-  const teacherId = ensureUser({
+  const teacherId = await ensureUser({
     role: 'teacher',
     username: 'teacher',
     password: '123456',
@@ -109,16 +121,19 @@ export function runSeed() {
     { username: 's4', displayName: '赵悦' },
   ];
 
-  const studentIds = students.map((item) =>
-    ensureUser({
-      role: 'student',
-      username: item.username,
-      password: '123456',
-      displayName: item.displayName,
-    }),
-  );
+  const studentIds = [];
+  for (const item of students) {
+    studentIds.push(
+      await ensureUser({
+        role: 'student',
+        username: item.username,
+        password: '123456',
+        displayName: item.displayName,
+      }),
+    );
+  }
 
-  const classId = ensureClass(teacherId, '八年级(1)班', '八年级', studentIds);
+  const classId = await ensureClass(teacherId, '八年级(1)班', '八年级', studentIds);
 
   return {
     teacherId,
@@ -134,7 +149,8 @@ const runDirectly =
   process.argv[1] && path.resolve(process.argv[1]) === path.resolve(thisFile);
 
 if (runDirectly) {
-  const result = runSeed();
+  await initSchema();
+  const result = await runSeed();
   console.log('演示数据初始化完成：');
   console.log(`  官方模板：${result.templateCount} 份`);
   console.log(`  内置AI工具：${result.toolCount} 个`);

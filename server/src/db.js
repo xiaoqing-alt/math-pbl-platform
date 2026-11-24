@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
+import pg from 'pg';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
@@ -10,11 +11,157 @@ export const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, '..', '
 fs.mkdirSync(DATA_DIR, { recursive: true });
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
-export const db = new DatabaseSync(path.join(DATA_DIR, 'math-pbl.db'));
+const DATABASE_URL = String(process.env.DATABASE_URL || '').trim();
+export const USE_POSTGRES = Boolean(DATABASE_URL);
 
-db.exec(`
-PRAGMA journal_mode = WAL;
+let sqlite = null;
+let pool = null;
 
+if (USE_POSTGRES) {
+  pool = new pg.Pool({
+    connectionString: DATABASE_URL,
+    max: Number(process.env.PG_POOL_MAX || 5),
+    ssl: DATABASE_URL.includes('sslmode=disable') ? false : { rejectUnauthorized: false },
+  });
+} else {
+  sqlite = new DatabaseSync(path.join(DATA_DIR, 'math-pbl.db'));
+  sqlite.exec('PRAGMA journal_mode = WAL;');
+}
+
+// SQLite 使用 ? 占位符，Postgres 使用 $1、$2；这里做统一转换（跳过单引号内的内容）
+function toPostgresSql(sql) {
+  let index = 0;
+  let inQuote = false;
+  let result = '';
+  for (let i = 0; i < sql.length; i += 1) {
+    const char = sql[i];
+    if (char === "'") {
+      inQuote = !inQuote;
+      result += char;
+      continue;
+    }
+    if (char === '?' && !inQuote) {
+      index += 1;
+      result += `$${index}`;
+      continue;
+    }
+    result += char;
+  }
+  return result;
+}
+
+export async function all(sql, params = []) {
+  if (!USE_POSTGRES) return sqlite.prepare(sql).all(...params);
+  const result = await pool.query(toPostgresSql(sql), params);
+  return result.rows;
+}
+
+export async function get(sql, params = []) {
+  const rows = await all(sql, params);
+  return rows.length > 0 ? rows[0] : null;
+}
+
+export async function run(sql, params = []) {
+  if (!USE_POSTGRES) {
+    const result = sqlite.prepare(sql).run(...params);
+    return {
+      changes: Number(result.changes || 0),
+      lastInsertRowid: result.lastInsertRowid === undefined ? null : Number(result.lastInsertRowid),
+    };
+  }
+  const result = await pool.query(toPostgresSql(sql), params);
+  const first = result.rows[0] || {};
+  return {
+    changes: Number(result.rowCount || 0),
+    lastInsertRowid: first.id === undefined ? null : Number(first.id),
+  };
+}
+
+export async function exec(sql) {
+  if (!USE_POSTGRES) return sqlite.exec(sql);
+  await pool.query(sql);
+}
+
+// 兼容原有同步写法：调用方统一加 await 即可
+export const db = {
+  prepare(sql) {
+    return {
+      get: (...params) => get(sql, params),
+      all: (...params) => all(sql, params),
+      run: (...params) => run(sql, params),
+    };
+  },
+};
+
+export async function closeDatabase() {
+  if (pool) {
+    await pool.end();
+    pool = null;
+  }
+  if (sqlite) {
+    sqlite.close();
+    sqlite = null;
+  }
+}
+
+function buildFacade(queryRunner) {
+  return {
+    prepare(sql) {
+      return {
+        get: (...params) => queryRunner.get(sql, params),
+        all: (...params) => queryRunner.all(sql, params),
+        run: (...params) => queryRunner.run(sql, params),
+      };
+    },
+  };
+}
+
+// 在一个事务里执行一组数据库操作：SQLite 用 BEGIN/COMMIT，Postgres 使用同一个连接
+export async function runTransaction(work) {
+  if (!USE_POSTGRES) {
+    sqlite.exec('BEGIN');
+    try {
+      const result = await work(db);
+      sqlite.exec('COMMIT');
+      return result;
+    } catch (error) {
+      sqlite.exec('ROLLBACK');
+      throw error;
+    }
+  }
+  const client = await pool.connect();
+  const scoped = buildFacade({
+    get: async (sql, params) => {
+      const result = await client.query(toPostgresSql(sql), params);
+      return result.rows[0] || null;
+    },
+    all: async (sql, params) => {
+      const result = await client.query(toPostgresSql(sql), params);
+      return result.rows;
+    },
+    run: async (sql, params) => {
+      const result = await client.query(toPostgresSql(sql), params);
+      const first = result.rows[0] || {};
+      return {
+        changes: Number(result.rowCount || 0),
+        lastInsertRowid: first.id === undefined ? null : Number(first.id),
+      };
+    },
+  });
+  try {
+    await client.query('BEGIN');
+    const result = await work(scoped);
+    await client.query('COMMIT');
+    return result;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   role TEXT NOT NULL CHECK (role IN ('teacher', 'student')),
@@ -141,27 +288,36 @@ CREATE TABLE IF NOT EXISTS submission_versions (
 );
 
 CREATE INDEX IF NOT EXISTS idx_versions_submission ON submission_versions (submission_id);
-`);
+`;
 
-const submissionColumns = db.prepare('PRAGMA table_info(submissions)').all();
-if (!submissionColumns.some((column) => column.name === 'worksheet')) {
-  db.exec("ALTER TABLE submissions ADD COLUMN worksheet TEXT NOT NULL DEFAULT '{}'");
+async function ensureColumn(table, column, definition) {
+  if (USE_POSTGRES) {
+    const existing = await pool.query(
+      'SELECT 1 FROM information_schema.columns WHERE table_name = $1 AND column_name = $2',
+      [table, column],
+    );
+    if (existing.rowCount === 0) {
+      await pool.query(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+    }
+    return;
+  }
+  const columns = sqlite.prepare(`PRAGMA table_info(${table})`).all();
+  if (!columns.some((item) => item.name === column)) {
+    sqlite.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  }
 }
 
-const toolColumns = db.prepare('PRAGMA table_info(tools)').all();
-if (!toolColumns.some((column) => column.name === 'category')) {
-  db.exec("ALTER TABLE tools ADD COLUMN category TEXT NOT NULL DEFAULT 'assist'");
-}
-
-const latestSubmissionColumns = db.prepare('PRAGMA table_info(submissions)').all();
-if (!latestSubmissionColumns.some((column) => column.name === 'criteria_scores')) {
-  db.exec("ALTER TABLE submissions ADD COLUMN criteria_scores TEXT NOT NULL DEFAULT '[]'");
-}
-if (!latestSubmissionColumns.some((column) => column.name === 'returned_at')) {
-  db.exec("ALTER TABLE submissions ADD COLUMN returned_at TEXT DEFAULT ''");
-}
-if (!latestSubmissionColumns.some((column) => column.name === 'return_note')) {
-  db.exec("ALTER TABLE submissions ADD COLUMN return_note TEXT DEFAULT ''");
+export async function initSchema() {
+  if (USE_POSTGRES) {
+    await pool.query(SCHEMA.replace(/INTEGER PRIMARY KEY AUTOINCREMENT/g, 'SERIAL PRIMARY KEY'));
+  } else {
+    sqlite.exec(SCHEMA);
+  }
+  await ensureColumn('submissions', 'worksheet', "TEXT NOT NULL DEFAULT '{}'");
+  await ensureColumn('tools', 'category', "TEXT NOT NULL DEFAULT 'assist'");
+  await ensureColumn('submissions', 'criteria_scores', "TEXT NOT NULL DEFAULT '[]'");
+  await ensureColumn('submissions', 'returned_at', "TEXT DEFAULT ''");
+  await ensureColumn('submissions', 'return_note', "TEXT DEFAULT ''");
 }
 
 export const BOARD_NAMES = {

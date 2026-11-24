@@ -73,14 +73,14 @@ export function verifyToken(token) {
   }
 }
 
-export function requireAuth(req, res, next) {
+export async function requireAuth(req, res, next) {
   const header = req.headers.authorization || '';
   const token = header.startsWith('Bearer ') ? header.slice(7) : '';
   const payload = verifyToken(token);
   if (!payload) {
     return res.status(401).json({ message: '登录状态已失效，请重新登录' });
   }
-  const user = db
+  const user = await db
     .prepare('SELECT id, role, username, display_name FROM users WHERE id = ?')
     .get(payload.uid);
   if (!user || user.role !== payload.role) {

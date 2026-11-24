@@ -1,9 +1,9 @@
-import express from 'express';
 import { db, parseJson, serializeSubmission, serializeTask, normalizeContent } from '../db.js';
+import { createRouter } from '../asyncRouter.js';
 import { requireAuth, requireRole } from '../auth.js';
 import { buildClassReport } from '../analysis.js';
 
-const router = express.Router();
+const router = createRouter();
 
 router.use(requireAuth, requireRole('teacher'));
 
@@ -12,19 +12,19 @@ function parseId(value) {
   return Number.isInteger(n) && n > 0 ? n : null;
 }
 
-function listVersionSummaries(submissionId) {
-  return db
+async function listVersionSummaries(submissionId) {
+  const rows = await db
     .prepare(
       'SELECT id, version_no, content, files, created_at FROM submission_versions WHERE submission_id = ? ORDER BY version_no DESC',
     )
-    .all(submissionId)
-    .map((row) => ({
-      id: Number(row.id),
-      versionNo: Number(row.version_no),
-      createdAt: row.created_at,
-      wordCount: Array.from(String(row.content || '').replace(/\s/g, '')).length,
-      fileCount: parseJson(row.files, []).length,
-    }));
+    .all(submissionId);
+  return rows.map((row) => ({
+    id: Number(row.id),
+    versionNo: Number(row.version_no),
+    createdAt: row.created_at,
+    wordCount: Array.from(String(row.content || '').replace(/\s/g, '')).length,
+    fileCount: parseJson(row.files, []).length,
+  }));
 }
 
 function normalizeCriteriaScores(raw, criteria) {
@@ -56,7 +56,7 @@ function weightedScore(criteria, scores) {
   return Math.round((sum / totalWeight) * 10) / 10;
 }
 
-function getOwnedAssignment(assignmentId, teacherId) {
+async function getOwnedAssignment(assignmentId, teacherId) {
   return db
     .prepare(
       `SELECT a.*, c.name AS class_name, t.title AS task_title, t.board AS board
@@ -68,14 +68,14 @@ function getOwnedAssignment(assignmentId, teacherId) {
     .get(assignmentId, teacherId);
 }
 
-router.get('/:id', (req, res) => {
+router.get('/:id', async (req, res) => {
   const assignmentId = parseId(req.params.id);
   if (!assignmentId) return res.status(400).json({ message: '任务编号无效' });
-  const row = getOwnedAssignment(assignmentId, req.user.id);
+  const row = await getOwnedAssignment(assignmentId, req.user.id);
   if (!row) return res.status(404).json({ message: '发布任务不存在或无权访问' });
 
-  const taskRow = db.prepare('SELECT * FROM tasks WHERE id = ?').get(row.task_id);
-  const members = db
+  const taskRow = await db.prepare('SELECT * FROM tasks WHERE id = ?').get(row.task_id);
+  const members = await db
     .prepare(
       `SELECT u.id, u.username, u.display_name
        FROM class_members m JOIN users u ON u.id = m.student_id
@@ -83,7 +83,7 @@ router.get('/:id', (req, res) => {
     )
     .all(row.class_id);
 
-  const submissionRows = db
+  const submissionRows = await db
     .prepare(
       `SELECT s.*, u.display_name AS student_name, u.username AS username
        FROM submissions s JOIN users u ON u.id = s.student_id
@@ -136,49 +136,51 @@ router.get('/:id', (req, res) => {
   });
 });
 
-router.post('/:id/withdraw', (req, res) => {
+router.post('/:id/withdraw', async (req, res) => {
   const assignmentId = parseId(req.params.id);
   if (!assignmentId) return res.status(400).json({ message: '任务编号无效' });
-  const row = getOwnedAssignment(assignmentId, req.user.id);
+  const row = await getOwnedAssignment(assignmentId, req.user.id);
   if (!row) return res.status(404).json({ message: '发布任务不存在或无权访问' });
 
-  db.prepare(`UPDATE assignments SET status = 'withdrawn', withdrawn_at = ? WHERE id = ?`).run(
+  await db.prepare(`UPDATE assignments SET status = 'withdrawn', withdrawn_at = ? WHERE id = ?`).run(
     new Date().toISOString(),
     assignmentId,
   );
   res.json({ ok: true, message: '已撤回该班级的发布任务' });
 });
 
-router.get('/:id/report', (req, res) => {
+router.get('/:id/report', async (req, res) => {
   const assignmentId = parseId(req.params.id);
   if (!assignmentId) return res.status(400).json({ message: '任务编号无效' });
-  const row = getOwnedAssignment(assignmentId, req.user.id);
+  const row = await getOwnedAssignment(assignmentId, req.user.id);
   if (!row) return res.status(404).json({ message: '发布任务不存在或无权访问' });
 
-  const taskRow = db.prepare('SELECT * FROM tasks WHERE id = ?').get(row.task_id);
+  const taskRow = await db.prepare('SELECT * FROM tasks WHERE id = ?').get(row.task_id);
   const task = serializeTask(taskRow);
 
-  const members = db
-    .prepare(
-      `SELECT u.id, u.username, u.display_name
-       FROM class_members m JOIN users u ON u.id = m.student_id
-       WHERE m.class_id = ? ORDER BY u.id`,
-    )
-    .all(row.class_id)
-    .map((item) => ({
-      id: Number(item.id),
-      username: item.username,
-      displayName: item.display_name,
-    }));
+  const members = (
+    await db
+      .prepare(
+        `SELECT u.id, u.username, u.display_name
+         FROM class_members m JOIN users u ON u.id = m.student_id
+         WHERE m.class_id = ? ORDER BY u.id`,
+      )
+      .all(row.class_id)
+  ).map((item) => ({
+    id: Number(item.id),
+    username: item.username,
+    displayName: item.display_name,
+  }));
 
-  const submissionRows = db
-    .prepare(
-      `SELECT s.*, u.display_name AS student_name, u.username AS username
-       FROM submissions s JOIN users u ON u.id = s.student_id
-       WHERE s.assignment_id = ?`,
-    )
-    .all(assignmentId)
-    .map(serializeSubmission);
+  const submissionRows = (
+    await db
+      .prepare(
+        `SELECT s.*, u.display_name AS student_name, u.username AS username
+         FROM submissions s JOIN users u ON u.id = s.student_id
+         WHERE s.assignment_id = ?`,
+      )
+      .all(assignmentId)
+  ).map(serializeSubmission);
 
   const report = buildClassReport({
     students: members,
@@ -199,14 +201,14 @@ router.get('/:id/report', (req, res) => {
   });
 });
 
-const submissionRouter = express.Router();
+const submissionRouter = createRouter();
 submissionRouter.use(requireAuth, requireRole('teacher'));
 
-submissionRouter.get('/:id', (req, res) => {
+submissionRouter.get('/:id', async (req, res) => {
   const submissionId = parseId(req.params.id);
   if (!submissionId) return res.status(400).json({ message: '提交记录编号无效' });
 
-  const row = db
+  const row = await db
     .prepare(
       `SELECT s.*, u.display_name AS student_name, u.username AS username,
         a.task_id, a.class_id, a.status AS assignment_status,
@@ -235,16 +237,16 @@ submissionRouter.get('/:id', (req, res) => {
       board: row.board,
       content: parseJson(row.task_content, {}),
     },
-    versions: listVersionSummaries(submissionId),
+    versions: await listVersionSummaries(submissionId),
     assignmentStatus: row.assignment_status,
   });
 });
 
-submissionRouter.patch('/:id', (req, res) => {
+submissionRouter.patch('/:id', async (req, res) => {
   const submissionId = parseId(req.params.id);
   if (!submissionId) return res.status(400).json({ message: '提交记录编号无效' });
 
-  const row = db
+  const row = await db
     .prepare(
       `SELECT s.*, a.teacher_id, a.task_id FROM submissions s JOIN assignments a ON a.id = s.assignment_id
        WHERE s.id = ? AND a.teacher_id = ?`,
@@ -256,7 +258,7 @@ submissionRouter.patch('/:id', (req, res) => {
   }
 
   const body = req.body || {};
-  const taskRow = db.prepare('SELECT content FROM tasks WHERE id = ?').get(row.task_id);
+  const taskRow = await db.prepare('SELECT content FROM tasks WHERE id = ?').get(row.task_id);
   const taskContent = normalizeContent(parseJson(taskRow && taskRow.content, {}));
   const criteria = taskContent.criteria || [];
   const now = new Date().toISOString();
@@ -266,12 +268,12 @@ submissionRouter.patch('/:id', (req, res) => {
     if (!String(feedback).trim()) {
       return res.status(400).json({ message: '退回修改需要填写具体原因或修改建议' });
     }
-    db.prepare(
+    await db.prepare(
       `UPDATE submissions SET status = 'returned', return_note = ?, returned_at = ?,
         score = NULL, criteria_scores = '[]', graded_at = '' WHERE id = ?`,
     ).run(String(feedback).trim(), now, submissionId);
 
-    const updated = db
+    const updated = await db
       .prepare(
         'SELECT s.*, u.display_name AS student_name, u.username AS username FROM submissions s JOIN users u ON u.id = s.student_id WHERE s.id = ?',
       )
@@ -297,12 +299,12 @@ submissionRouter.patch('/:id', (req, res) => {
     score = null;
   }
 
-  db.prepare(
+  await db.prepare(
     `UPDATE submissions SET score = ?, feedback = ?, criteria_scores = ?, graded_at = ?,
       status = 'submitted', returned_at = '' WHERE id = ?`,
   ).run(score, feedback, JSON.stringify(criteriaScores), now, submissionId);
 
-  const updated = db
+  const updated = await db
     .prepare('SELECT s.*, u.display_name AS student_name, u.username AS username FROM submissions s JOIN users u ON u.id = s.student_id WHERE s.id = ?')
     .get(submissionId);
 

@@ -1,4 +1,3 @@
-import express from 'express';
 import {
   db,
   isBoard,
@@ -6,11 +5,12 @@ import {
   parseJson,
   serializeTask,
 } from '../db.js';
+import { createRouter } from '../asyncRouter.js';
 import { requireAuth, requireRole } from '../auth.js';
 import { recommendSkills } from '../aiSkills.js';
 import { serializeTools } from './tools.js';
 
-const router = express.Router();
+const router = createRouter();
 
 router.use(requireAuth, requireRole('teacher'));
 
@@ -38,7 +38,7 @@ function emptyContent() {
   };
 }
 
-function getOwnedTask(taskId, teacherId) {
+async function getOwnedTask(taskId, teacherId) {
   return db.prepare('SELECT * FROM tasks WHERE id = ? AND teacher_id = ?').get(taskId, teacherId);
 }
 
@@ -59,8 +59,8 @@ function serializeAssignment(row) {
   };
 }
 
-router.get('/', (req, res) => {
-  const rows = db
+router.get('/', async (req, res) => {
+  const rows = await db
     .prepare(
       `SELECT t.*,
         (SELECT COUNT(*) FROM assignments a WHERE a.task_id = t.id AND a.status = 'published') AS assignment_count,
@@ -79,32 +79,32 @@ router.get('/', (req, res) => {
   });
 });
 
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
   const title = String(req.body.title || '').trim() || '未命名任务单';
   const board = String(req.body.board || '');
   if (!isBoard(board)) return res.status(400).json({ message: '请选择有效的数学板块' });
 
   const now = new Date().toISOString();
   const content = normalizeContent(emptyContent());
-  const result = db
+  const inserted = await db
     .prepare(
       `INSERT INTO tasks (teacher_id, template_id, board, title, project_type, grade, duration, summary, cover_image, content, ai_enabled, ai_skills, created_at, updated_at)
-       VALUES (?, NULL, ?, ?, '', '', '', '', '', ?, 0, '[]', ?, ?)`,
+       VALUES (?, NULL, ?, ?, '', '', '', '', '', ?, 0, '[]', ?, ?) RETURNING id`,
     )
-    .run(req.user.id, board, title, JSON.stringify(content), now, now);
+    .get(req.user.id, board, title, JSON.stringify(content), now, now);
 
-  const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(result.lastInsertRowid);
+  const task = await db.prepare('SELECT * FROM tasks WHERE id = ?').get(inserted.id);
   res.status(201).json({ task: serializeTask(task) });
 });
 
-router.get('/:id', (req, res) => {
+router.get('/:id', async (req, res) => {
   const taskId = parseId(req.params.id);
   if (!taskId) return res.status(400).json({ message: '任务单编号无效' });
-  const row = getOwnedTask(taskId, req.user.id);
+  const row = await getOwnedTask(taskId, req.user.id);
   if (!row) return res.status(404).json({ message: '任务单不存在或无权访问' });
 
   const task = serializeTask(row);
-  const assignmentRows = db
+  const assignmentRows = await db
     .prepare(
       `SELECT a.*, c.name AS class_name, t.title AS task_title, t.board AS board,
         (SELECT COUNT(*) FROM class_members m WHERE m.class_id = a.class_id) AS student_count,
@@ -120,14 +120,14 @@ router.get('/:id', (req, res) => {
     task,
     assignments: assignmentRows.map(serializeAssignment),
     availableSkills: recommendSkills(task),
-    taskTools: serializeTools(task.content.toolKeys),
+    taskTools: await serializeTools(task.content.toolKeys),
   });
 });
 
-router.patch('/:id', (req, res) => {
+router.patch('/:id', async (req, res) => {
   const taskId = parseId(req.params.id);
   if (!taskId) return res.status(400).json({ message: '任务单编号无效' });
-  const row = getOwnedTask(taskId, req.user.id);
+  const row = await getOwnedTask(taskId, req.user.id);
   if (!row) return res.status(404).json({ message: '任务单不存在或无权访问' });
 
   const title = req.body.title === undefined ? row.title : String(req.body.title || '').trim();
@@ -147,7 +147,7 @@ router.patch('/:id', (req, res) => {
   const summary = req.body.summary === undefined ? row.summary : String(req.body.summary || '');
   const coverImage = req.body.coverImage === undefined ? row.cover_image : String(req.body.coverImage || '');
 
-  db.prepare(
+  await db.prepare(
     `UPDATE tasks SET title = ?, board = ?, project_type = ?, grade = ?, duration = ?, summary = ?, cover_image = ?, content = ?, updated_at = ?
      WHERE id = ?`,
   ).run(
@@ -163,35 +163,35 @@ router.patch('/:id', (req, res) => {
     taskId,
   );
 
-  const updated = db.prepare('SELECT * FROM tasks WHERE id = ?').get(taskId);
+  const updated = await db.prepare('SELECT * FROM tasks WHERE id = ?').get(taskId);
   const task = serializeTask(updated);
   res.json({ task, availableSkills: recommendSkills(task) });
 });
 
-router.delete('/:id', (req, res) => {
+router.delete('/:id', async (req, res) => {
   const taskId = parseId(req.params.id);
   if (!taskId) return res.status(400).json({ message: '任务单编号无效' });
-  const row = getOwnedTask(taskId, req.user.id);
+  const row = await getOwnedTask(taskId, req.user.id);
   if (!row) return res.status(404).json({ message: '任务单不存在或无权访问' });
 
-  const submissionCount = db
+  const submissionCount = await db
     .prepare(
       `SELECT COUNT(*) AS count FROM submissions s JOIN assignments a ON a.id = s.assignment_id WHERE a.task_id = ?`,
     )
-    .get(taskId).count;
-  if (Number(submissionCount) > 0) {
+    .get(taskId);
+  if (Number(submissionCount.count) > 0) {
     return res.status(409).json({ message: '已有学生提交成果，不能删除该任务单' });
   }
 
-  db.prepare('DELETE FROM assignments WHERE task_id = ?').run(taskId);
-  db.prepare('DELETE FROM tasks WHERE id = ?').run(taskId);
+  await db.prepare('DELETE FROM assignments WHERE task_id = ?').run(taskId);
+  await db.prepare('DELETE FROM tasks WHERE id = ?').run(taskId);
   res.json({ ok: true });
 });
 
-router.patch('/:id/ai', (req, res) => {
+router.patch('/:id/ai', async (req, res) => {
   const taskId = parseId(req.params.id);
   if (!taskId) return res.status(400).json({ message: '任务单编号无效' });
-  const row = getOwnedTask(taskId, req.user.id);
+  const row = await getOwnedTask(taskId, req.user.id);
   if (!row) return res.status(404).json({ message: '任务单不存在或无权访问' });
 
   const task = serializeTask(row);
@@ -204,62 +204,62 @@ router.patch('/:id/ai', (req, res) => {
     .map((key) => String(key || '').trim())
     .filter((key) => allowedKeys.has(key));
 
-  db.prepare('UPDATE tasks SET ai_enabled = ?, ai_skills = ?, updated_at = ? WHERE id = ?').run(
+  await db.prepare('UPDATE tasks SET ai_enabled = ?, ai_skills = ?, updated_at = ? WHERE id = ?').run(
     aiEnabled ? 1 : 0,
     JSON.stringify(aiSkills),
     new Date().toISOString(),
     taskId,
   );
 
-  const updated = db.prepare('SELECT * FROM tasks WHERE id = ?').get(taskId);
+  const updated = await db.prepare('SELECT * FROM tasks WHERE id = ?').get(taskId);
   const next = serializeTask(updated);
   res.json({ task: next, availableSkills: recommendSkills(next) });
 });
 
-router.get('/:id/ai/skills', (req, res) => {
+router.get('/:id/ai/skills', async (req, res) => {
   const taskId = parseId(req.params.id);
   if (!taskId) return res.status(400).json({ message: '任务单编号无效' });
-  const row = getOwnedTask(taskId, req.user.id);
+  const row = await getOwnedTask(taskId, req.user.id);
   if (!row) return res.status(404).json({ message: '任务单不存在或无权访问' });
   const task = serializeTask(row);
   res.json({ availableSkills: recommendSkills(task), aiEnabled: task.aiEnabled, aiSkills: task.aiSkills });
 });
 
-router.post('/:id/publish', (req, res) => {
+router.post('/:id/publish', async (req, res) => {
   const taskId = parseId(req.params.id);
   const classId = parseId(req.body.classId);
   if (!taskId || !classId) return res.status(400).json({ message: '任务单或班级编号无效' });
 
-  const taskRow = getOwnedTask(taskId, req.user.id);
+  const taskRow = await getOwnedTask(taskId, req.user.id);
   if (!taskRow) return res.status(404).json({ message: '任务单不存在或无权访问' });
-  const classRow = db
+  const classRow = await db
     .prepare('SELECT * FROM classes WHERE id = ? AND teacher_id = ?')
     .get(classId, req.user.id);
   if (!classRow) return res.status(404).json({ message: '班级不存在或无权访问' });
 
   const dueAt = String(req.body.dueAt || '').trim();
   const now = new Date().toISOString();
-  const existing = db
+  const existing = await db
     .prepare('SELECT * FROM assignments WHERE task_id = ? AND class_id = ?')
     .get(taskId, classId);
 
   let assignmentId;
   if (existing) {
-    db.prepare(
+    await db.prepare(
       `UPDATE assignments SET status = 'published', due_at = ?, published_at = ?, withdrawn_at = '' WHERE id = ?`,
     ).run(dueAt, now, existing.id);
     assignmentId = Number(existing.id);
   } else {
-    const result = db
+    const inserted = await db
       .prepare(
         `INSERT INTO assignments (task_id, class_id, teacher_id, status, due_at, published_at, withdrawn_at)
-         VALUES (?, ?, ?, 'published', ?, ?, '')`,
+         VALUES (?, ?, ?, 'published', ?, ?, '') RETURNING id`,
       )
-      .run(taskId, classId, req.user.id, dueAt, now);
-    assignmentId = Number(result.lastInsertRowid);
+      .get(taskId, classId, req.user.id, dueAt, now);
+    assignmentId = Number(inserted.id);
   }
 
-  const assignment = db.prepare('SELECT * FROM assignments WHERE id = ?').get(assignmentId);
+  const assignment = await db.prepare('SELECT * FROM assignments WHERE id = ?').get(assignmentId);
   res.status(201).json({
     assignment: serializeAssignment({ ...assignment, class_name: classRow.name, task_title: taskRow.title, board: taskRow.board }),
     message: `已发布到「${classRow.name}」`,

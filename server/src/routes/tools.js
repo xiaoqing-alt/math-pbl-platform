@@ -1,13 +1,13 @@
-import express from 'express';
 import multer from 'multer';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { db, parseJson, UPLOAD_DIR } from '../db.js';
+import { createRouter } from '../asyncRouter.js';
 import { requireAuth, requireRole, verifyToken } from '../auth.js';
 
-const router = express.Router();
+const router = createRouter();
 const serverRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const builtinDir = path.join(serverRoot, 'tools');
 const uploadDir = path.join(UPLOAD_DIR, 'tools');
@@ -35,25 +35,25 @@ function filePathOf(row) {
   return row.builtin ? path.join(builtinDir, row.file_name) : path.join(uploadDir, row.file_name);
 }
 
-export function serializeTools(keys) {
+export async function serializeTools(keys) {
   if (!Array.isArray(keys) || keys.length === 0) return [];
   const placeholders = keys.map(() => '?').join(',');
-  return db
+  const rows = await db
     .prepare(`SELECT * FROM tools WHERE tool_key IN (${placeholders})`)
-    .all(...keys)
-    .map(serialize);
+    .all(...keys);
+  return rows.map(serialize);
 }
 
 // 教师可选工具：内置 + 自己上传
-router.get('/', requireAuth, (req, res) => {
-  const rows = db
+router.get('/', requireAuth, async (req, res) => {
+  const rows = await db
     .prepare('SELECT * FROM tools WHERE builtin = 1 OR owner_id = ? ORDER BY builtin DESC, id ASC')
     .all(req.user.id);
   res.json({ tools: rows.map(serialize) });
 });
 
 // 教师上传自己的 HTML 工具
-router.post('/', requireAuth, requireRole('teacher'), upload.single('file'), (req, res) => {
+router.post('/', requireAuth, requireRole('teacher'), upload.single('file'), async (req, res) => {
   const name = String(req.body.name || '').trim();
   const description = String(req.body.description || '').trim();
   const boards = String(req.body.boards || '')
@@ -74,7 +74,7 @@ router.post('/', requireAuth, requireRole('teacher'), upload.single('file'), (re
   const fileName = `${randomUUID()}.html`;
   fs.writeFileSync(path.join(uploadDir, fileName), req.file.buffer);
   const toolKey = `u_${randomUUID().slice(0, 8)}`;
-  db.prepare(
+  await db.prepare(
     `INSERT INTO tools (tool_key, owner_id, name, description, boards, file_name, builtin, category, created_at)
      VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)`,
   ).run(
@@ -88,13 +88,13 @@ router.post('/', requireAuth, requireRole('teacher'), upload.single('file'), (re
     new Date().toISOString(),
   );
 
-  const row = db.prepare('SELECT * FROM tools WHERE tool_key = ?').get(toolKey);
+  const row = await db.prepare('SELECT * FROM tools WHERE tool_key = ?').get(toolKey);
   res.status(201).json({ tool: serialize(row) });
 });
 
 // 删除自己上传的工具（内置不可删）
-router.delete('/:key', requireAuth, requireRole('teacher'), (req, res) => {
-  const row = db.prepare('SELECT * FROM tools WHERE tool_key = ?').get(req.params.key);
+router.delete('/:key', requireAuth, requireRole('teacher'), async (req, res) => {
+  const row = await db.prepare('SELECT * FROM tools WHERE tool_key = ?').get(req.params.key);
   if (!row) return res.status(404).json({ message: '工具不存在' });
   if (row.builtin) return res.status(403).json({ message: '内置工具不可删除' });
   if (Number(row.owner_id) !== req.user.id) return res.status(404).json({ message: '工具不存在' });
@@ -104,12 +104,12 @@ router.delete('/:key', requireAuth, requireRole('teacher'), (req, res) => {
   } catch {
     // 文件已不存在时忽略
   }
-  db.prepare('DELETE FROM tools WHERE id = ?').run(row.id);
+  await db.prepare('DELETE FROM tools WHERE id = ?').run(row.id);
   res.json({ ok: true });
 });
 
 // iframe 加载工具文件：使用查询参数 token 鉴权，文件以沙箱 CSP 返回
-router.get('/:key/file', (req, res) => {
+router.get('/:key/file', async (req, res) => {
   let user = null;
   try {
     user = verifyToken(String(req.query.token || ''));
@@ -118,7 +118,7 @@ router.get('/:key/file', (req, res) => {
   }
   if (!user) return res.status(401).json({ message: '请先登录' });
 
-  const row = db.prepare('SELECT * FROM tools WHERE tool_key = ?').get(req.params.key);
+  const row = await db.prepare('SELECT * FROM tools WHERE tool_key = ?').get(req.params.key);
   if (!row) return res.status(404).json({ message: '工具不存在' });
   if (!row.builtin && Number(row.owner_id) !== Number(user.uid)) {
     return res.status(403).json({ message: '无权使用该工具' });

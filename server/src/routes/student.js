@@ -1,17 +1,18 @@
-import express from 'express';
 import {
   db,
+  parseJson,
   serializeSubmission,
   serializeTask,
   BOARD_NAMES,
   normalizeWorksheet,
 } from '../db.js';
+import { createRouter } from '../asyncRouter.js';
 import { requireAuth, requireRole } from '../auth.js';
 import { buildGuide, resolveSkills } from '../aiSkills.js';
 import { analyzeSubmission, worksheetToText } from '../analysis.js';
 import { serializeTools } from './tools.js';
 
-const router = express.Router();
+const router = createRouter();
 
 router.use(requireAuth, requireRole('student'));
 
@@ -36,22 +37,22 @@ function aiRateLimit(req, res, next) {
   next();
 }
 
-function listVersionSummaries(submissionId) {
-  return db
+async function listVersionSummaries(submissionId) {
+  const rows = await db
     .prepare(
       'SELECT id, version_no, content, files, created_at FROM submission_versions WHERE submission_id = ? ORDER BY version_no DESC',
     )
-    .all(submissionId)
-    .map((row) => ({
-      id: Number(row.id),
-      versionNo: Number(row.version_no),
-      createdAt: row.created_at,
-      wordCount: Array.from(String(row.content || '').replace(/\s/g, '')).length,
-      fileCount: JSON.parse(row.files || '[]').length,
-    }));
+    .all(submissionId);
+  return rows.map((row) => ({
+    id: Number(row.id),
+    versionNo: Number(row.version_no),
+    createdAt: row.created_at,
+    wordCount: Array.from(String(row.content || '').replace(/\s/g, '')).length,
+    fileCount: parseJson(row.files, []).length,
+  }));
 }
 
-function getStudentAssignment(assignmentId, studentId) {
+async function getStudentAssignment(assignmentId, studentId) {
   return db
     .prepare(
       `SELECT a.*, c.name AS class_name, t.title AS task_title, t.board AS board,
@@ -66,24 +67,25 @@ function getStudentAssignment(assignmentId, studentId) {
     .get(studentId, assignmentId);
 }
 
-router.get('/summary', (req, res) => {
-  const classRows = db
-    .prepare(
-      `SELECT c.id, c.name, c.grade, u.display_name AS teacher_name
-       FROM class_members m
-       JOIN classes c ON c.id = m.class_id
-       JOIN users u ON u.id = c.teacher_id
-       WHERE m.student_id = ? ORDER BY c.id`,
-    )
-    .all(req.user.id)
-    .map((item) => ({
-      id: Number(item.id),
-      name: item.name,
-      grade: item.grade || '',
-      teacherName: item.teacher_name,
-    }));
+router.get('/summary', async (req, res) => {
+  const classRows = (
+    await db
+      .prepare(
+        `SELECT c.id, c.name, c.grade, u.display_name AS teacher_name
+         FROM class_members m
+         JOIN classes c ON c.id = m.class_id
+         JOIN users u ON u.id = c.teacher_id
+         WHERE m.student_id = ? ORDER BY c.id`,
+      )
+      .all(req.user.id)
+  ).map((item) => ({
+    id: Number(item.id),
+    name: item.name,
+    grade: item.grade || '',
+    teacherName: item.teacher_name,
+  }));
 
-  const assignmentRows = db
+  const assignmentRows = await db
     .prepare(
       `SELECT a.id, a.status, s.status AS submission_status, s.graded_at
        FROM assignments a
@@ -110,8 +112,8 @@ router.get('/summary', (req, res) => {
   });
 });
 
-router.get('/tasks', (req, res) => {
-  const rows = db
+router.get('/tasks', async (req, res) => {
+  const rows = await db
     .prepare(
       `SELECT a.id AS assignment_id, a.due_at, a.published_at, a.status AS assignment_status,
         t.id AS task_id, t.title, t.board, t.summary, t.project_type, t.grade, t.duration, t.cover_image,
@@ -159,20 +161,20 @@ router.get('/tasks', (req, res) => {
   });
 });
 
-router.get('/assignments/:id', (req, res) => {
+router.get('/assignments/:id', async (req, res) => {
   const assignmentId = parseId(req.params.id);
   if (!assignmentId) return res.status(400).json({ message: '任务编号无效' });
 
-  const row = getStudentAssignment(assignmentId, req.user.id);
+  const row = await getStudentAssignment(assignmentId, req.user.id);
   if (!row) return res.status(404).json({ message: '任务不存在或未发布给你的班级' });
   if (row.status !== 'published') {
     return res.status(403).json({ message: '该任务已被教师撤回，暂时无法查看' });
   }
 
-  const taskRow = db.prepare('SELECT * FROM tasks WHERE id = ?').get(row.task_id);
+  const taskRow = await db.prepare('SELECT * FROM tasks WHERE id = ?').get(row.task_id);
   const task = serializeTask(taskRow);
 
-  const submissionRow = db
+  const submissionRow = await db
     .prepare(
       `SELECT s.*, u.display_name AS student_name, u.username AS username
        FROM submissions s JOIN users u ON u.id = s.student_id
@@ -196,26 +198,26 @@ router.get('/assignments/:id', (req, res) => {
     task,
     teacherName: row.teacher_name,
     submission,
-    versions: submissionRow ? listVersionSummaries(submissionRow.id) : [],
+    versions: submissionRow ? await listVersionSummaries(submissionRow.id) : [],
     ai: {
       enabled: task.aiEnabled,
       skills: enabledSkills,
-      tools: task.aiEnabled ? serializeTools(task.content.toolKeys) : [],
+      tools: task.aiEnabled ? await serializeTools(task.content.toolKeys) : [],
     },
   });
 });
 
-router.put('/assignments/:id/submission', (req, res) => {
+router.put('/assignments/:id/submission', async (req, res) => {
   const assignmentId = parseId(req.params.id);
   if (!assignmentId) return res.status(400).json({ message: '任务编号无效' });
 
-  const row = getStudentAssignment(assignmentId, req.user.id);
+  const row = await getStudentAssignment(assignmentId, req.user.id);
   if (!row) return res.status(404).json({ message: '任务不存在或未发布给你的班级' });
   if (row.status !== 'published') {
     return res.status(403).json({ message: '该任务已被撤回，无法提交' });
   }
 
-  const existing = db
+  const existing = await db
     .prepare('SELECT * FROM submissions WHERE assignment_id = ? AND student_id = ?')
     .get(assignmentId, req.user.id);
   if (existing && existing.graded_at) {
@@ -241,7 +243,7 @@ router.put('/assignments/:id/submission', (req, res) => {
   const worksheetText = worksheetToText(worksheet);
 
   const submit = Boolean(req.body.submit);
-  const taskRow = db.prepare('SELECT * FROM tasks WHERE id = ?').get(row.task_id);
+  const taskRow = await db.prepare('SELECT * FROM tasks WHERE id = ?').get(row.task_id);
   const task = serializeTask(taskRow);
 
   const now = new Date().toISOString();
@@ -263,31 +265,37 @@ router.put('/assignments/:id/submission', (req, res) => {
 
   let submissionId = existing ? Number(existing.id) : 0;
   if (existing) {
-    db.prepare(
-      `UPDATE submissions SET content = ?, worksheet = ?, files = ?, status = ?, analysis = ?, submitted_at = ?, updated_at = ?
-       WHERE id = ?`,
-    ).run(content, worksheetJson, filesJson, status, analysisJson, submittedAt, now, existing.id);
+    await db
+      .prepare(
+        `UPDATE submissions SET content = ?, worksheet = ?, files = ?, status = ?, analysis = ?, submitted_at = ?, updated_at = ?
+         WHERE id = ?`,
+      )
+      .run(content, worksheetJson, filesJson, status, analysisJson, submittedAt, now, existing.id);
   } else {
-    const inserted = db.prepare(
-      `INSERT INTO submissions (assignment_id, student_id, content, worksheet, files, status, analysis, submitted_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).run(assignmentId, req.user.id, content, worksheetJson, filesJson, status, analysisJson, submittedAt, now);
-    submissionId = Number(inserted.lastInsertRowid);
+    const inserted = await db
+      .prepare(
+        `INSERT INTO submissions (assignment_id, student_id, content, worksheet, files, status, analysis, submitted_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+      )
+      .get(assignmentId, req.user.id, content, worksheetJson, filesJson, status, analysisJson, submittedAt, now);
+    submissionId = Number(inserted.id);
   }
 
   // 每次正式提交都留存一个版本，便于教师追溯修改过程
   if (submit) {
-    const latest = db
+    const latest = await db
       .prepare('SELECT MAX(version_no) AS version_no FROM submission_versions WHERE submission_id = ?')
       .get(submissionId);
     const nextVersion = Number((latest && latest.version_no) || 0) + 1;
-    db.prepare(
-      `INSERT INTO submission_versions (submission_id, version_no, content, worksheet, files, created_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-    ).run(submissionId, nextVersion, content, worksheetJson, filesJson, now);
+    await db
+      .prepare(
+        `INSERT INTO submission_versions (submission_id, version_no, content, worksheet, files, created_at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      )
+      .run(submissionId, nextVersion, content, worksheetJson, filesJson, now);
   }
 
-  const saved = db
+  const saved = await db
     .prepare(
       `SELECT s.*, u.display_name AS student_name, u.username AS username
        FROM submissions s JOIN users u ON u.id = s.student_id
@@ -298,7 +306,7 @@ router.put('/assignments/:id/submission', (req, res) => {
   const resubmitted = submit && existing && existing.status === 'returned';
   res.json({
     submission: serializeSubmission(saved),
-    versions: listVersionSummaries(submissionId),
+    versions: await listVersionSummaries(submissionId),
     message: submit
       ? resubmitted
         ? '已按教师建议重新提交，教师端可以查看新版本'
@@ -307,17 +315,17 @@ router.put('/assignments/:id/submission', (req, res) => {
   });
 });
 
-router.post('/assignments/:id/ai/guide', aiRateLimit, (req, res) => {
+router.post('/assignments/:id/ai/guide', aiRateLimit, async (req, res) => {
   const assignmentId = parseId(req.params.id);
   if (!assignmentId) return res.status(400).json({ message: '任务编号无效' });
 
-  const row = getStudentAssignment(assignmentId, req.user.id);
+  const row = await getStudentAssignment(assignmentId, req.user.id);
   if (!row) return res.status(404).json({ message: '任务不存在或未发布给你的班级' });
   if (row.status !== 'published') {
     return res.status(403).json({ message: '该任务已被撤回，无法使用AI辅助' });
   }
 
-  const taskRow = db.prepare('SELECT * FROM tasks WHERE id = ?').get(row.task_id);
+  const taskRow = await db.prepare('SELECT * FROM tasks WHERE id = ?').get(row.task_id);
   const task = serializeTask(taskRow);
   if (!task.aiEnabled) {
     return res.status(403).json({ message: '教师未开启这份任务单的AI辅助功能' });
@@ -332,17 +340,17 @@ router.post('/assignments/:id/ai/guide', aiRateLimit, (req, res) => {
 });
 
 // AI 成果评价：对当前草稿做规则版评分与自检，未提交前即可反复使用
-router.post('/assignments/:id/ai/evaluate', aiRateLimit, (req, res) => {
+router.post('/assignments/:id/ai/evaluate', aiRateLimit, async (req, res) => {
   const assignmentId = parseId(req.params.id);
   if (!assignmentId) return res.status(400).json({ message: '任务编号无效' });
 
-  const row = getStudentAssignment(assignmentId, req.user.id);
+  const row = await getStudentAssignment(assignmentId, req.user.id);
   if (!row) return res.status(404).json({ message: '任务不存在或未发布给你的班级' });
   if (row.status !== 'published') {
     return res.status(403).json({ message: '该任务已被教师撤回，无法使用AI辅助' });
   }
 
-  const taskRow = db.prepare('SELECT * FROM tasks WHERE id = ?').get(row.task_id);
+  const taskRow = await db.prepare('SELECT * FROM tasks WHERE id = ?').get(row.task_id);
   const task = serializeTask(taskRow);
   if (!task.aiEnabled) {
     return res.status(403).json({ message: '教师未开启这份任务单的AI辅助功能' });

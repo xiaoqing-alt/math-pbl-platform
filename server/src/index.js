@@ -3,7 +3,7 @@ import cors from 'cors';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { db, UPLOAD_DIR } from './db.js';
+import { initSchema, closeDatabase, UPLOAD_DIR } from './db.js';
 import { runSeed } from './seed.js';
 import authRouter from './routes/auth.js';
 import { classesRouter } from './routes/classes.js';
@@ -17,7 +17,8 @@ import toolsRouter from './routes/tools.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 3001);
 
-runSeed();
+await initSchema();
+await runSeed();
 
 const app = express();
 
@@ -87,9 +88,9 @@ const server = app.listen(PORT, () => {
 });
 
 function shutdown() {
-  server.close(() => {
+  server.close(async () => {
     try {
-      db.close();
+      await closeDatabase();
     } catch {
       // ignore
     }

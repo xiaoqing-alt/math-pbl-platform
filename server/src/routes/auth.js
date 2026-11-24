@@ -1,10 +1,10 @@
-import express from 'express';
+import { createRouter } from '../asyncRouter.js';
 import { db, serializeUser } from '../db.js';
 import { hashPassword, verifyPassword, signToken, requireAuth } from '../auth.js';
 
-const router = express.Router();
+const router = createRouter();
 
-router.post('/register', (req, res) => {
+router.post('/register', async (req, res) => {
   const username = String(req.body.username || '').trim();
   const password = String(req.body.password || '');
   const displayName = String(req.body.displayName || '').trim() || username;
@@ -24,18 +24,18 @@ router.post('/register', (req, res) => {
   if (username.length > 32) return res.status(400).json({ message: '用户名不能超过 32 个字符' });
   if (password.length < 6) return res.status(400).json({ message: '密码至少需要 6 位' });
 
-  const exists = db.prepare('SELECT id FROM users WHERE username = ?').get(username);
+  const exists = await db.prepare('SELECT id FROM users WHERE username = ?').get(username);
   if (exists) return res.status(409).json({ message: '该用户名已被使用，请换一个' });
 
-  const result = db
-    .prepare('INSERT INTO users (role, username, password, display_name, created_at) VALUES (?, ?, ?, ?, ?)')
-    .run('teacher', username, hashPassword(password), displayName, new Date().toISOString());
+  const result = await db
+    .prepare('INSERT INTO users (role, username, password, display_name, created_at) VALUES (?, ?, ?, ?, ?) RETURNING id')
+    .get('teacher', username, hashPassword(password), displayName, new Date().toISOString());
 
-  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(result.lastInsertRowid);
+  const user = await db.prepare('SELECT * FROM users WHERE id = ?').get(result.id);
   return res.status(201).json({ token: signToken(user), user: serializeUser(user) });
 });
 
-router.post('/login', (req, res) => {
+router.post('/login', async (req, res) => {
   const username = String(req.body.username || '').trim();
   const password = String(req.body.password || '');
   const role = String(req.body.role || '').trim();
@@ -44,7 +44,7 @@ router.post('/login', (req, res) => {
     return res.status(400).json({ message: '请输入用户名和密码' });
   }
 
-  const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
+  const user = await db.prepare('SELECT * FROM users WHERE username = ?').get(username);
   if (!user || !verifyPassword(password, user.password)) {
     return res.status(401).json({ message: '用户名或密码不正确' });
   }

@@ -1,10 +1,10 @@
-import express from 'express';
 import multer from 'multer';
 import * as XLSX from 'xlsx';
-import { db } from '../db.js';
+import { db, runTransaction } from '../db.js';
+import { createRouter } from '../asyncRouter.js';
 import { requireAuth, requireRole, hashPassword } from '../auth.js';
 
-const router = express.Router();
+const router = createRouter();
 
 const excelUpload = multer({
   storage: multer.memoryStorage(),
@@ -29,8 +29,8 @@ function serializeClass(row) {
   };
 }
 
-router.get('/', (req, res) => {
-  const rows = db
+router.get('/', async (req, res) => {
+  const rows = await db
     .prepare(
       `SELECT c.*,
         (SELECT COUNT(*) FROM class_members m WHERE m.class_id = c.id) AS student_count,
@@ -41,28 +41,28 @@ router.get('/', (req, res) => {
   res.json({ classes: rows.map(serializeClass) });
 });
 
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
   const name = String(req.body.name || '').trim();
   const grade = String(req.body.grade || '').trim();
   if (!name) return res.status(400).json({ message: '请输入班级名称' });
   if (name.length > 40) return res.status(400).json({ message: '班级名称不能超过 40 个字符' });
 
-  const duplicate = db
+  const duplicate = await db
     .prepare('SELECT id FROM classes WHERE teacher_id = ? AND name = ?')
     .get(req.user.id, name);
   if (duplicate) return res.status(409).json({ message: '你已经创建了同名班级' });
 
-  const result = db
-    .prepare('INSERT INTO classes (teacher_id, name, grade, created_at) VALUES (?, ?, ?, ?)')
-    .run(req.user.id, name, grade, new Date().toISOString());
-  const row = db.prepare('SELECT * FROM classes WHERE id = ?').get(result.lastInsertRowid);
+  const inserted = await db
+    .prepare('INSERT INTO classes (teacher_id, name, grade, created_at) VALUES (?, ?, ?, ?) RETURNING id')
+    .get(req.user.id, name, grade, new Date().toISOString());
+  const row = await db.prepare('SELECT * FROM classes WHERE id = ?').get(inserted.id);
   res.status(201).json({ class: serializeClass(row) });
 });
 
-router.get('/:id', (req, res) => {
+router.get('/:id', async (req, res) => {
   const classId = parseId(req.params.id);
   if (!classId) return res.status(400).json({ message: '班级编号无效' });
-  const row = db
+  const row = await db
     .prepare(
       `SELECT c.*,
         (SELECT COUNT(*) FROM class_members m WHERE m.class_id = c.id) AS student_count,
@@ -72,48 +72,50 @@ router.get('/:id', (req, res) => {
     .get(classId, req.user.id);
   if (!row) return res.status(404).json({ message: '班级不存在或无权访问' });
 
-  const students = db
-    .prepare(
-      `SELECT u.id, u.username, u.display_name, m.joined_at
-       FROM class_members m JOIN users u ON u.id = m.student_id
-       WHERE m.class_id = ? ORDER BY u.id`,
-    )
-    .all(classId)
-    .map((item) => ({
-      id: Number(item.id),
-      username: item.username,
-      displayName: item.display_name,
-      joinedAt: item.joined_at,
-    }));
+  const students = (
+    await db
+      .prepare(
+        `SELECT u.id, u.username, u.display_name, m.joined_at
+         FROM class_members m JOIN users u ON u.id = m.student_id
+         WHERE m.class_id = ? ORDER BY u.id`,
+      )
+      .all(classId)
+  ).map((item) => ({
+    id: Number(item.id),
+    username: item.username,
+    displayName: item.display_name,
+    joinedAt: item.joined_at,
+  }));
 
-  const assignments = db
-    .prepare(
-      `SELECT a.*, t.title AS task_title, t.board AS board,
-        (SELECT COUNT(*) FROM class_members m WHERE m.class_id = a.class_id) AS student_count,
-        (SELECT COUNT(*) FROM submissions s WHERE s.assignment_id = a.id AND s.status = 'submitted') AS submitted_count
-       FROM assignments a JOIN tasks t ON t.id = a.task_id
-       WHERE a.class_id = ? ORDER BY a.published_at DESC`,
-    )
-    .all(classId)
-    .map((item) => ({
-      id: Number(item.id),
-      taskId: Number(item.task_id),
-      taskTitle: item.task_title,
-      board: item.board,
-      status: item.status,
-      dueAt: item.due_at || '',
-      publishedAt: item.published_at,
-      studentCount: Number(item.student_count || 0),
-      submittedCount: Number(item.submitted_count || 0),
-    }));
+  const assignments = (
+    await db
+      .prepare(
+        `SELECT a.*, t.title AS task_title, t.board AS board,
+          (SELECT COUNT(*) FROM class_members m WHERE m.class_id = a.class_id) AS student_count,
+          (SELECT COUNT(*) FROM submissions s WHERE s.assignment_id = a.id AND s.status = 'submitted') AS submitted_count
+         FROM assignments a JOIN tasks t ON t.id = a.task_id
+         WHERE a.class_id = ? ORDER BY a.published_at DESC`,
+      )
+      .all(classId)
+  ).map((item) => ({
+    id: Number(item.id),
+    taskId: Number(item.task_id),
+    taskTitle: item.task_title,
+    board: item.board,
+    status: item.status,
+    dueAt: item.due_at || '',
+    publishedAt: item.published_at,
+    studentCount: Number(item.student_count || 0),
+    submittedCount: Number(item.submitted_count || 0),
+  }));
 
   res.json({ class: serializeClass(row), students, assignments });
 });
 
-router.patch('/:id', (req, res) => {
+router.patch('/:id', async (req, res) => {
   const classId = parseId(req.params.id);
   if (!classId) return res.status(400).json({ message: '班级编号无效' });
-  const row = db
+  const row = await db
     .prepare('SELECT * FROM classes WHERE id = ? AND teacher_id = ?')
     .get(classId, req.user.id);
   if (!row) return res.status(404).json({ message: '班级不存在或无权访问' });
@@ -122,35 +124,35 @@ router.patch('/:id', (req, res) => {
   const grade = req.body.grade === undefined ? row.grade : String(req.body.grade || '').trim();
   if (!name) return res.status(400).json({ message: '班级名称不能为空' });
 
-  db.prepare('UPDATE classes SET name = ?, grade = ? WHERE id = ?').run(name, grade, classId);
-  const updated = db.prepare('SELECT * FROM classes WHERE id = ?').get(classId);
+  await db.prepare('UPDATE classes SET name = ?, grade = ? WHERE id = ?').run(name, grade, classId);
+  const updated = await db.prepare('SELECT * FROM classes WHERE id = ?').get(classId);
   res.json({ class: serializeClass(updated) });
 });
 
-router.delete('/:id', (req, res) => {
+router.delete('/:id', async (req, res) => {
   const classId = parseId(req.params.id);
   if (!classId) return res.status(400).json({ message: '班级编号无效' });
-  const row = db
+  const row = await db
     .prepare('SELECT * FROM classes WHERE id = ? AND teacher_id = ?')
     .get(classId, req.user.id);
   if (!row) return res.status(404).json({ message: '班级不存在或无权访问' });
 
-  const assignmentCount = db
+  const assignmentCount = await db
     .prepare('SELECT COUNT(*) AS count FROM assignments WHERE class_id = ?')
-    .get(classId).count;
-  if (Number(assignmentCount) > 0) {
+    .get(classId);
+  if (Number(assignmentCount.count) > 0) {
     return res.status(409).json({ message: '该班级已有任务发布记录，暂不能删除班级' });
   }
 
-  db.prepare('DELETE FROM class_members WHERE class_id = ?').run(classId);
-  db.prepare('DELETE FROM classes WHERE id = ?').run(classId);
+  await db.prepare('DELETE FROM class_members WHERE class_id = ?').run(classId);
+  await db.prepare('DELETE FROM classes WHERE id = ?').run(classId);
   res.json({ ok: true });
 });
 
-router.post('/:id/students', (req, res) => {
+router.post('/:id/students', async (req, res) => {
   const classId = parseId(req.params.id);
   if (!classId) return res.status(400).json({ message: '班级编号无效' });
-  const classRow = db
+  const classRow = await db
     .prepare('SELECT * FROM classes WHERE id = ? AND teacher_id = ?')
     .get(classId, req.user.id);
   if (!classRow) return res.status(404).json({ message: '班级不存在或无权访问' });
@@ -162,7 +164,7 @@ router.post('/:id/students', (req, res) => {
   if (!username) return res.status(400).json({ message: '学生用户名不能为空' });
   if (username.length > 32) return res.status(400).json({ message: '学生用户名不能超过 32 个字符' });
 
-  let student = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
+  let student = await db.prepare('SELECT * FROM users WHERE username = ?').get(username);
   if (student && student.role !== 'student') {
     return res.status(409).json({ message: '该用户名属于教师账号，不能添加为学生' });
   }
@@ -171,23 +173,23 @@ router.post('/:id/students', (req, res) => {
     if (password.length < 6) {
       return res.status(400).json({ message: '新建学生账号时，密码至少需要 6 位' });
     }
-    const result = db
-      .prepare('INSERT INTO users (role, username, password, display_name, created_at) VALUES (?, ?, ?, ?, ?)')
-      .run('student', username, hashPassword(password), displayName, new Date().toISOString());
-    student = db.prepare('SELECT * FROM users WHERE id = ?').get(result.lastInsertRowid);
+    const inserted = await db
+      .prepare(
+        'INSERT INTO users (role, username, password, display_name, created_at) VALUES (?, ?, ?, ?, ?) RETURNING id',
+      )
+      .get('student', username, hashPassword(password), displayName, new Date().toISOString());
+    student = await db.prepare('SELECT * FROM users WHERE id = ?').get(inserted.id);
     isNewAccount = true;
   }
 
-  const exists = db
+  const exists = await db
     .prepare('SELECT id FROM class_members WHERE class_id = ? AND student_id = ?')
     .get(classId, student.id);
   if (exists) return res.status(409).json({ message: '该学生已在本班中' });
 
-  db.prepare('INSERT INTO class_members (class_id, student_id, joined_at) VALUES (?, ?, ?)').run(
-    classId,
-    student.id,
-    new Date().toISOString(),
-  );
+  await db
+    .prepare('INSERT INTO class_members (class_id, student_id, joined_at) VALUES (?, ?, ?)')
+    .run(classId, student.id, new Date().toISOString());
 
   res.status(201).json({
     student: {
@@ -199,24 +201,26 @@ router.post('/:id/students', (req, res) => {
   });
 });
 
-router.delete('/:id/students/:studentId', (req, res) => {
+router.delete('/:id/students/:studentId', async (req, res) => {
   const classId = parseId(req.params.id);
   const studentId = parseId(req.params.studentId);
   if (!classId || !studentId) return res.status(400).json({ message: '参数无效' });
-  const classRow = db
+  const classRow = await db
     .prepare('SELECT * FROM classes WHERE id = ? AND teacher_id = ?')
     .get(classId, req.user.id);
   if (!classRow) return res.status(404).json({ message: '班级不存在或无权访问' });
 
-  db.prepare('DELETE FROM class_members WHERE class_id = ? AND student_id = ?').run(classId, studentId);
+  await db
+    .prepare('DELETE FROM class_members WHERE class_id = ? AND student_id = ?')
+    .run(classId, studentId);
   res.json({ ok: true });
 });
 
 // 下载批量导入用的 Excel 模板
-router.get('/:id/students/template', (req, res) => {
+router.get('/:id/students/template', async (req, res) => {
   const classId = parseId(req.params.id);
   if (!classId) return res.status(400).json({ message: '班级编号无效' });
-  const classRow = db
+  const classRow = await db
     .prepare('SELECT * FROM classes WHERE id = ? AND teacher_id = ?')
     .get(classId, req.user.id);
   if (!classRow) return res.status(404).json({ message: '班级不存在或无权访问' });
@@ -240,10 +244,10 @@ router.get('/:id/students/template', (req, res) => {
 });
 
 // 上传填好的 Excel 批量导入学生
-router.post('/:id/students/import', excelUpload.single('file'), (req, res) => {
+router.post('/:id/students/import', excelUpload.single('file'), async (req, res) => {
   const classId = parseId(req.params.id);
   if (!classId) return res.status(400).json({ message: '班级编号无效' });
-  const classRow = db
+  const classRow = await db
     .prepare('SELECT * FROM classes WHERE id = ? AND teacher_id = ?')
     .get(classId, req.user.id);
   if (!classRow) return res.status(404).json({ message: '班级不存在或无权访问' });
@@ -278,63 +282,62 @@ router.post('/:id/students/import', excelUpload.single('file'), (req, res) => {
   if (rows.length === 0) return res.status(400).json({ message: '文件中没有学生数据，请按模板填写' });
 
   const result = { added: 0, joined: 0, skipped: [] };
-  db.exec('BEGIN');
   try {
-    for (const item of rows) {
-      const { username, displayName, password } = item;
-      const line = `${username} / ${displayName}`;
-      if (username.length > 32) {
-        result.skipped.push({ line, reason: '用户名超过 32 个字符' });
-        continue;
-      }
-      let student = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
-      if (student && student.role !== 'student') {
-        result.skipped.push({ line, reason: '该用户名属于教师账号' });
-        continue;
-      }
-      if (!student) {
-        if (password.length < 6) {
-          result.skipped.push({ line, reason: '新账号初始密码至少 6 位' });
+    await runTransaction(async (tx) => {
+      for (const item of rows) {
+        const { username, displayName, password } = item;
+        const line = `${username} / ${displayName}`;
+        if (username.length > 32) {
+          result.skipped.push({ line, reason: '用户名超过 32 个字符' });
           continue;
         }
-        const inserted = db
-          .prepare('INSERT INTO users (role, username, password, display_name, created_at) VALUES (?, ?, ?, ?, ?)')
-          .run('student', username, hashPassword(password), displayName || username, new Date().toISOString());
-        student = db.prepare('SELECT * FROM users WHERE id = ?').get(inserted.lastInsertRowid);
-        result.added += 1;
+        let student = await tx.prepare('SELECT * FROM users WHERE username = ?').get(username);
+        if (student && student.role !== 'student') {
+          result.skipped.push({ line, reason: '该用户名属于教师账号' });
+          continue;
+        }
+        if (!student) {
+          if (password.length < 6) {
+            result.skipped.push({ line, reason: '新账号初始密码至少 6 位' });
+            continue;
+          }
+          const inserted = await tx
+            .prepare(
+              'INSERT INTO users (role, username, password, display_name, created_at) VALUES (?, ?, ?, ?, ?) RETURNING id',
+            )
+            .get('student', username, hashPassword(password), displayName || username, new Date().toISOString());
+          student = await tx.prepare('SELECT * FROM users WHERE id = ?').get(inserted.id);
+          result.added += 1;
+        }
+        const member = await tx
+          .prepare('SELECT id FROM class_members WHERE class_id = ? AND student_id = ?')
+          .get(classId, student.id);
+        if (member) {
+          result.skipped.push({ line, reason: '该学生已在本班中' });
+          continue;
+        }
+        await tx
+          .prepare('INSERT INTO class_members (class_id, student_id, joined_at) VALUES (?, ?, ?)')
+          .run(classId, student.id, new Date().toISOString());
+        result.joined += 1;
       }
-      const member = db
-        .prepare('SELECT id FROM class_members WHERE class_id = ? AND student_id = ?')
-        .get(classId, student.id);
-      if (member) {
-        result.skipped.push({ line, reason: '该学生已在本班中' });
-        continue;
-      }
-      db.prepare('INSERT INTO class_members (class_id, student_id, joined_at) VALUES (?, ?, ?)').run(
-        classId,
-        student.id,
-        new Date().toISOString(),
-      );
-      result.joined += 1;
-    }
-    db.exec('COMMIT');
+    });
   } catch (error) {
-    db.exec('ROLLBACK');
     return res.status(500).json({ message: '导入失败：' + error.message });
   }
 
   res.json({ result });
 });
 
-router.get('/:id/students/export', (req, res) => {
+router.get('/:id/students/export', async (req, res) => {
   const classId = parseId(req.params.id);
   if (!classId) return res.status(400).json({ message: '班级编号无效' });
-  const classRow = db
+  const classRow = await db
     .prepare('SELECT * FROM classes WHERE id = ? AND teacher_id = ?')
     .get(classId, req.user.id);
   if (!classRow) return res.status(404).json({ message: '班级不存在或无权访问' });
 
-  const students = db
+  const students = await db
     .prepare(
       `SELECT u.username, u.display_name FROM class_members m JOIN users u ON u.id = m.student_id
        WHERE m.class_id = ? ORDER BY u.id`,
