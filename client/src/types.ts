@@ -68,7 +68,20 @@ export interface WorksheetStage {
   rows: string[][];
 }
 
+export interface TeamMember {
+  name: string;
+  task: string;
+}
+
+export interface WorksheetInfo {
+  name: string;
+  className: string;
+  fillDate: string;
+}
+
 export interface Worksheet {
+  info: WorksheetInfo;
+  team: TeamMember[];
   stages: WorksheetStage[];
   selfScores: string[];
   gains: string;

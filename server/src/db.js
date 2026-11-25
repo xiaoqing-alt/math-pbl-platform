@@ -474,7 +474,19 @@ export function normalizeContent(raw) {
 export function normalizeWorksheet(raw) {
   const worksheet = raw && typeof raw === 'object' ? raw : {};
   const list = (v) => (Array.isArray(v) ? v : []);
+  const info = worksheet.info && typeof worksheet.info === 'object' ? worksheet.info : {};
   return {
+    info: {
+      name: String(info.name || ''),
+      className: String(info.className || ''),
+      fillDate: String(info.fillDate || ''),
+    },
+    team: list(worksheet.team)
+      .map((member) => ({
+        name: String((member && member.name) || ''),
+        task: String((member && member.task) || ''),
+      }))
+      .slice(0, 20),
     stages: list(worksheet.stages).map((stage) => ({
       text: String((stage && stage.text) || ''),
       rows: list(stage && stage.rows).map((row) =>

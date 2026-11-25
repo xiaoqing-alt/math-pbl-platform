@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { api, formatDate, formatDateTime, fileUrl, uploadFile } from '../../api';
+import { api, formatDate, formatDateTime, fileUrl, getUser, uploadFile } from '../../api';
 import type { AiGuide, AiSkill, Analysis, FileInfo, Submission, SubmissionVersion, Task, ToolInfo, Worksheet } from '../../types';
 import { BoardBadge, StatusBadge } from '../../components/Bits';
-import TaskContentView from '../../components/TaskContentView';
+import TaskContentView, { ContentSection } from '../../components/TaskContentView';
 import { EvaluationPanel, ToolFrame } from '../../components/AiTools';
 
 interface WorkspaceResponse {
@@ -22,8 +22,17 @@ interface WorkspaceResponse {
   ai: { enabled: boolean; skills: AiSkill[]; tools: ToolInfo[] };
 }
 
+function todayText() {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${now.getFullYear()}-${month}-${day}`;
+}
+
 function emptyWorksheet(task: Task): Worksheet {
   return {
+    info: { name: '', className: '', fillDate: todayText() },
+    team: [],
     stages: (task.content.stages || []).map(() => ({ text: '', rows: [] })),
     selfScores: (task.content.rubric || []).map(() => ''),
     gains: '',
@@ -35,6 +44,12 @@ function mergeWorksheet(saved: Worksheet | null | undefined, task: Task): Worksh
   const base = emptyWorksheet(task);
   if (!saved) return base;
   return {
+    info: {
+      name: saved.info?.name || '',
+      className: saved.info?.className || '',
+      fillDate: saved.info?.fillDate || base.info.fillDate,
+    },
+    team: Array.isArray(saved.team) ? saved.team : [],
     stages: base.stages.map((stage, index) => saved.stages?.[index] || stage),
     selfScores: base.selfScores.map((score, index) => saved.selfScores?.[index] || score),
     gains: saved.gains || '',
@@ -48,7 +63,14 @@ export default function StudentTaskWorkspace() {
 
   const [data, setData] = useState<WorkspaceResponse | null>(null);
   const [content, setContent] = useState('');
-  const [worksheet, setWorksheet] = useState<Worksheet>({ stages: [], selfScores: [], gains: '', difficulties: '' });
+  const [worksheet, setWorksheet] = useState<Worksheet>({
+    info: { name: '', className: '', fillDate: todayText() },
+    team: [],
+    stages: [],
+    selfScores: [],
+    gains: '',
+    difficulties: '',
+  });
   const [files, setFiles] = useState<FileInfo[]>([]);
   const [versions, setVersions] = useState<SubmissionVersion[]>([]);
   const [tab, setTab] = useState<'submit' | 'ai'>('submit');
@@ -71,7 +93,16 @@ export default function StudentTaskWorkspace() {
         if (!active) return;
         setData(result);
         setContent(result.submission?.content || '');
-        setWorksheet(mergeWorksheet(result.submission?.worksheet, result.task));
+        const merged = mergeWorksheet(result.submission?.worksheet, result.task);
+        const user = getUser();
+        setWorksheet({
+          ...merged,
+          info: {
+            name: merged.info.name || (user?.displayName || ''),
+            className: merged.info.className || result.assignment.className || '',
+            fillDate: merged.info.fillDate || todayText(),
+          },
+        });
         setFiles(result.submission?.files || []);
         setVersions(result.versions || []);
         if (result.ai.skills.length > 0) setSelectedSkill(result.ai.skills[0].key);
@@ -159,6 +190,7 @@ export default function StudentTaskWorkspace() {
 
   const hasWorksheetContent = useMemo(
     () =>
+      worksheet.team.some((member) => member.name.trim() || member.task.trim()) ||
       worksheet.stages.some(
         (stage) => stage.text.trim().length > 0 || stage.rows.some((row) => row.some((cell) => cell.trim())),
       ) ||
@@ -246,6 +278,141 @@ export default function StudentTaskWorkspace() {
               {submission.returnNote && <div style={{ marginTop: 6 }}>修改建议：{submission.returnNote}</div>}
             </div>
           )}
+
+          <ContentSection title="基础信息">
+            <div className="info-grid">
+              <label className="field">
+                <span>姓名</span>
+                <input
+                  value={worksheet.info.name}
+                  readOnly={readOnly}
+                  placeholder="请填写姓名"
+                  onChange={(event) =>
+                    setWorksheet((current) => ({
+                      ...current,
+                      info: { ...current.info, name: event.target.value },
+                    }))
+                  }
+                />
+              </label>
+              <label className="field">
+                <span>班级</span>
+                <input
+                  value={worksheet.info.className}
+                  readOnly={readOnly}
+                  placeholder="如：八年级1班"
+                  onChange={(event) =>
+                    setWorksheet((current) => ({
+                      ...current,
+                      info: { ...current.info, className: event.target.value },
+                    }))
+                  }
+                />
+              </label>
+              <label className="field">
+                <span>填写日期</span>
+                <input
+                  type="date"
+                  value={worksheet.info.fillDate}
+                  readOnly={readOnly}
+                  onChange={(event) =>
+                    setWorksheet((current) => ({
+                      ...current,
+                      info: { ...current.info, fillDate: event.target.value },
+                    }))
+                  }
+                />
+              </label>
+            </div>
+
+            <h3 className="info-subtitle">团队分工情况</h3>
+            <div className="table-wrap">
+              <table className="criteria-table input-table team-table">
+                <thead>
+                  <tr>
+                    <th>成员姓名</th>
+                    <th>承担任务</th>
+                    {!readOnly && <th style={{ width: 64 }}>操作</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {worksheet.team.length === 0 && (
+                    <tr>
+                      <td colSpan={readOnly ? 2 : 3} className="table-hint">
+                        点击下方“添加成员”登记小组分工
+                      </td>
+                    </tr>
+                  )}
+                  {worksheet.team.map((member, index) => (
+                    <tr key={index}>
+                      <td>
+                        <input
+                          className="cell-input"
+                          value={member.name}
+                          readOnly={readOnly}
+                          placeholder="如：张三"
+                          onChange={(event) =>
+                            setWorksheet((current) => ({
+                              ...current,
+                              team: current.team.map((item, i) =>
+                                i === index ? { ...item, name: event.target.value } : item,
+                              ),
+                            }))
+                          }
+                        />
+                      </td>
+                      <td>
+                        <input
+                          className="cell-input"
+                          value={member.task}
+                          readOnly={readOnly}
+                          placeholder="如：实地走访调查"
+                          onChange={(event) =>
+                            setWorksheet((current) => ({
+                              ...current,
+                              team: current.team.map((item, i) =>
+                                i === index ? { ...item, task: event.target.value } : item,
+                              ),
+                            }))
+                          }
+                        />
+                      </td>
+                      {!readOnly && (
+                        <td>
+                          <button
+                            className="tiny-btn"
+                            type="button"
+                            onClick={() =>
+                              setWorksheet((current) => ({
+                                ...current,
+                                team: current.team.filter((_, i) => i !== index),
+                              }))
+                            }
+                          >
+                            删除
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {!readOnly && (
+              <button
+                className="add-btn"
+                type="button"
+                onClick={() =>
+                  setWorksheet((current) => ({
+                    ...current,
+                    team: [...current.team, { name: '', task: '' }],
+                  }))
+                }
+              >
+                + 添加成员
+              </button>
+            )}
+          </ContentSection>
 
           <TaskContentView
             content={task.content}

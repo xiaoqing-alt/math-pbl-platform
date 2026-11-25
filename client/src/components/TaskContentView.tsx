@@ -1,3 +1,4 @@
+import { useState, type ReactNode } from 'react';
 import { fileUrl, formatFileSize } from '../api';
 import type { TaskContent, Worksheet } from '../types';
 import MathText from './MathText';
@@ -12,6 +13,28 @@ export interface ContentAnswerProps {
   onRemoveRow: (stageIndex: number, rowIndex: number) => void;
 }
 
+// 可折叠板块：标题点击展开/收起
+export function ContentSection({
+  title,
+  children,
+  defaultOpen = true,
+}: {
+  title: string;
+  children: ReactNode;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className={`content-section collapsible${open ? ' open' : ''}`}>
+      <button type="button" className="section-toggle" onClick={() => setOpen((value) => !value)}>
+        <span className="section-caret">{open ? '▼' : '▶'}</span>
+        <span className="section-title">{title}</span>
+      </button>
+      {open && <div className="section-body">{children}</div>}
+    </div>
+  );
+}
+
 export default function TaskContentView({
   content,
   answer,
@@ -19,78 +42,65 @@ export default function TaskContentView({
   content: TaskContent;
   answer?: ContentAnswerProps;
 }) {
+  const hasIntro = Boolean(
+    content.background ||
+      (content.objectives || []).length > 0 ||
+      (content.knowledgeTags || []).length > 0 ||
+      content.description,
+  );
+
   return (
     <>
-      {content.background && (
-        <div className="content-section">
-          <h2>项目背景</h2>
-          <p className="prose">
-            <MathText text={content.background} />
-          </p>
-        </div>
-      )}
+      {hasIntro && (
+        <ContentSection title="项目简介">
+          {content.background && (
+            <div className="intro-block">
+              <h3>项目背景</h3>
+              <p className="prose">
+                <MathText text={content.background} />
+              </p>
+            </div>
+          )}
 
-      {(content.objectives || []).length > 0 && (
-        <div className="content-section">
-          <h2>项目目标</h2>
-          <ul className="objective-list">
-            {content.objectives.map((item, index) => (
-              <li key={`${item}-${index}`}>
-                <MathText text={item} />
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+          {(content.objectives || []).length > 0 && (
+            <div className="intro-block">
+              <h3>项目目标</h3>
+              <ul className="objective-list">
+                {content.objectives.map((item, index) => (
+                  <li key={`${item}-${index}`}>
+                    <MathText text={item} />
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
-      {(content.knowledgeTags || []).length > 0 && (
-        <div className="content-section">
-          <h2>涉及知识</h2>
-          <div className="tag-list">
-            {content.knowledgeTags.map((tag) => (
-              <span className="knowledge-tag" key={tag}>
-                {tag}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {content.description && (
-        <div className="content-section">
-          <h2>驱动问题与成果要求</h2>
-          <p className="prose">
-            <MathText text={content.description} />
-          </p>
-        </div>
-      )}
-
-      {(content.steps || []).length > 0 && (
-        <div className="content-section">
-          <h2>实施流程</h2>
-          <div className="step-list">
-            {content.steps.map((step, index) => (
-              <div className="step-item" key={index}>
-                <span className="step-index">{index + 1}</span>
-                <div>
-                  <h3>
-                    <MathText text={step.title || `第 ${index + 1} 步`} />
-                  </h3>
-                  {step.content && (
-                    <p>
-                      <MathText text={step.content} />
-                    </p>
-                  )}
-                </div>
+          {(content.knowledgeTags || []).length > 0 && (
+            <div className="intro-block">
+              <h3>涉及知识</h3>
+              <div className="tag-list">
+                {content.knowledgeTags.map((tag) => (
+                  <span className="knowledge-tag" key={tag}>
+                    {tag}
+                  </span>
+                ))}
               </div>
-            ))}
-          </div>
-        </div>
+            </div>
+          )}
+
+          {content.description && (
+            <div className="intro-block">
+              <h3>驱动问题与成果要求</h3>
+              <p className="prose">
+                <MathText text={content.description} />
+              </p>
+            </div>
+          )}
+        </ContentSection>
       )}
 
       {(content.stages || []).length > 0 && (
-        <div className="content-section">
-          <h2>项目进程</h2>
+        <ContentSection title="项目进程">
           {content.stages.map((stage, index) => {
             const stageAnswer = answer ? answer.worksheet.stages[index] || { text: '', rows: [] } : null;
             return (
@@ -131,7 +141,7 @@ export default function TaskContentView({
                             </td>
                           </tr>
                         )}
-                        {answer && stageAnswer.rows.length === 0 && (
+                        {answer && (stageAnswer?.rows.length || 0) === 0 && (
                           <tr>
                             <td
                               colSpan={stage.columns.length + (answer.readOnly ? 0 : 1)}
@@ -142,7 +152,7 @@ export default function TaskContentView({
                           </tr>
                         )}
                         {answer &&
-                          stageAnswer.rows.map((row, rowIndex) => (
+                          (stageAnswer?.rows || []).map((row, rowIndex) => (
                             <tr key={rowIndex}>
                               {stage.columns.map((_, cellIndex) => (
                                 <td key={cellIndex}>
@@ -188,7 +198,7 @@ export default function TaskContentView({
                     <span>{stage.prompt ? '在此作答' : '本阶段作答'}</span>
                     <textarea
                       rows={4}
-                      value={stageAnswer.text}
+                      value={stageAnswer?.text || ''}
                       readOnly={answer.readOnly}
                       placeholder="记录本阶段的做法、数据、计算与结论"
                       onChange={(event) => answer.onText(index, event.target.value)}
@@ -198,12 +208,11 @@ export default function TaskContentView({
               </div>
             );
           })}
-        </div>
+        </ContentSection>
       )}
 
       {(content.rubric || []).length > 0 && (
-        <div className="content-section">
-          <h2>自我评价量表</h2>
+        <ContentSection title="自我评价量表">
           <div className="table-wrap">
             <table className="criteria-table rubric-table">
               <thead>
@@ -238,23 +247,21 @@ export default function TaskContentView({
               </tbody>
             </table>
           </div>
-        </div>
+        </ContentSection>
       )}
 
       {(content.reflections || []).length > 0 && (
-        <div className="content-section">
-          <h2>总结与反思</h2>
+        <ContentSection title="总结与反思">
           <ul className="objective-list">
             {content.reflections.map((item, index) => (
               <li key={index}>{item}</li>
             ))}
           </ul>
-        </div>
+        </ContentSection>
       )}
 
       {(content.criteria || []).length > 0 && (
-        <div className="content-section">
-          <h2>教师评价标准</h2>
+        <ContentSection title="教师评价标准" defaultOpen={false}>
           <div className="table-wrap">
             <table className="criteria-table">
               <thead>
@@ -279,12 +286,11 @@ export default function TaskContentView({
               </tbody>
             </table>
           </div>
-        </div>
+        </ContentSection>
       )}
 
       {(content.references || []).length > 0 && (
-        <div className="content-section">
-          <h2>配套参考范例</h2>
+        <ContentSection title="配套参考范例" defaultOpen={false}>
           {content.references.map((reference, index) => (
             <div className="reference-item" key={index}>
               <h3>
@@ -318,7 +324,7 @@ export default function TaskContentView({
               )}
             </div>
           ))}
-        </div>
+        </ContentSection>
       )}
     </>
   );

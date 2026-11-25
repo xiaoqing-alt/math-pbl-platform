@@ -547,51 +547,6 @@ export default function TaskEditor() {
           </div>
 
           <div className="editor-section">
-            <h2>实施步骤</h2>
-            {content.steps.map((step, index) => (
-              <div className="dynamic-item" key={index}>
-                <div className="dynamic-item-head">
-                  <span>步骤 {index + 1}</span>
-                  <button
-                    className="tiny-btn"
-                    type="button"
-                    onClick={() => patchContent({ steps: content.steps.filter((_, i) => i !== index) })}
-                  >
-                    删除
-                  </button>
-                </div>
-                <input
-                  className="input"
-                  value={step.title}
-                  onChange={(event) => {
-                    const steps = content.steps.map((item, i) => (i === index ? { ...item, title: event.target.value } : item));
-                    patchContent({ steps });
-                  }}
-                  placeholder="步骤名称"
-                  style={{ marginBottom: 8 }}
-                />
-                <textarea
-                  className="textarea"
-                  rows={6}
-                  value={step.content}
-                  onChange={(event) => {
-                    const steps = content.steps.map((item, i) => (i === index ? { ...item, content: event.target.value } : item));
-                    patchContent({ steps });
-                  }}
-                  placeholder="学生需要做什么？完成后应产出什么？"
-                />
-              </div>
-            ))}
-            <button
-              className="add-btn"
-              type="button"
-              onClick={() => patchContent({ steps: [...content.steps, { title: '', content: '' }] })}
-            >
-              + 添加实施步骤
-            </button>
-          </div>
-
-          <div className="editor-section">
             <h2>工具库</h2>
             <p className="muted small-text">
               勾选本任务单要用的工具（可多选）：交互探究教具用于拖动、滑动、反复试验；辅助工具用于计算、梳理与表达。学生端侧栏会加载对应页面，结果可一键写入作答。

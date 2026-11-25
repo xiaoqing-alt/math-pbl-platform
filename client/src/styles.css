@@ -1723,6 +1723,85 @@ p {
   margin-bottom: 12px;
 }
 
+/* 可折叠板块：标题栏点击展开/收起 */
+.section-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+}
+
+.section-caret {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--brand-soft, #e8f4fd);
+  color: var(--brand, #1a73c8);
+  font-size: 9px;
+  line-height: 1;
+}
+
+.section-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--ink, #1b2333);
+}
+
+.section-body {
+  margin-top: 12px;
+}
+
+.collapsible:not(.open) {
+  padding-bottom: 16px;
+}
+
+.intro-block + .intro-block {
+  margin-top: 14px;
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+@media (max-width: 720px) {
+  .info-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.info-subtitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #3d4760;
+  margin: 18px 0 10px;
+}
+
+.info-subtitle::before {
+  content: '';
+  width: 3px;
+  height: 14px;
+  border-radius: 2px;
+  background: var(--brand, #1a73c8);
+}
+
+.team-table td {
+  padding: 4px;
+}
+
 .content-section h3 {
   font-size: 14px;
   margin: 12px 0 6px;

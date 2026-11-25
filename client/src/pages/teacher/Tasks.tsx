@@ -139,7 +139,7 @@ export default function Tasks() {
               ))}
             </select>
           </label>
-          <div className="alert info">创建后可以补充学习目标、任务描述、实施步骤、评价标准和参考范例。</div>
+          <div className="alert info">创建后可以补充学习目标、任务描述、项目进程、评价标准和参考范例。</div>
           <div className="modal-actions">
             <button className="outline-btn" type="button" onClick={() => setShowCreate(false)}>
               取消
