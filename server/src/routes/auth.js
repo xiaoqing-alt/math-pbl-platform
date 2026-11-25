@@ -4,6 +4,13 @@ import { hashPassword, verifyPassword, signToken, requireAuth } from '../auth.js
 
 const router = createRouter();
 
+router.get('/config', (req, res) => {
+  const inviteCode = String(process.env.TEACHER_INVITE_CODE || '').trim();
+  res.json({
+    registrationEnabled: Boolean(inviteCode),
+  });
+});
+
 router.post('/register', async (req, res) => {
   const username = String(req.body.username || '').trim();
   const password = String(req.body.password || '');

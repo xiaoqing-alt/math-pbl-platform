@@ -11,4 +11,16 @@ export default defineConfig({
       '/uploads': 'http://localhost:3001',
     },
   },
+  build: {
+    chunkSizeWarningLimit: 800,
+    rollupOptions: {
+      output: {
+        // KaTeX 单独打包成懒加载 chunk，减少首屏 JS 体积
+        manualChunks(id) {
+          if (id.includes('katex')) return 'katex';
+          if (id.includes('react-dom') || id.includes('react/')) return 'react';
+        },
+      },
+    },
+  },
 });

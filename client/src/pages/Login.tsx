@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { api, getUser, roleHome, saveAuth } from '../api';
 import type { Role, User } from '../types';
@@ -8,11 +8,30 @@ interface LoginResponse {
   user: User;
 }
 
+function useRegistrationEnabled() {
+  const [enabled, setEnabled] = useState<boolean | null>(null);
+  useEffect(() => {
+    let mounted = true;
+    api<{ registrationEnabled: boolean }>('/auth/config', { auth: false })
+      .then((cfg) => {
+        if (mounted) setEnabled(Boolean(cfg && cfg.registrationEnabled));
+      })
+      .catch(() => {
+        if (mounted) setEnabled(false);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+  return enabled;
+}
+
 export default function Login() {
   const params = useParams();
   const role = (params.role === 'student' ? 'student' : 'teacher') as Role;
   const navigate = useNavigate();
   const existing = getUser();
+  const registrationEnabled = useRegistrationEnabled();
 
   const [username, setUsername] = useState(role === 'teacher' ? 'teacher' : 'student');
   const [password, setPassword] = useState('123456');
@@ -64,6 +83,9 @@ export default function Login() {
     }
   }
 
+  // 注册入口仅在后端配置了邀请码时才展示，避免引导用户进入注定失败的流程
+  const canShowRegister = role === 'teacher' && registrationEnabled === true;
+
   return (
     <div className="auth-page">
       <div className="auth-card">
@@ -84,14 +106,14 @@ export default function Login() {
           </Link>
         </div>
 
-        <h2>{showRegister ? '注册教师账号' : role === 'teacher' ? '教师登录' : '学生登录'}</h2>
+        <h2>{showRegister && canShowRegister ? '注册教师账号' : role === 'teacher' ? '教师登录' : '学生登录'}</h2>
         <p className="auth-sub">
           {role === 'teacher'
             ? '管理班级、编辑任务单、发布项目并批阅学生成果'
             : '查看教师发布的任务单，在线完成并提交成果'}
         </p>
 
-        <form onSubmit={showRegister ? handleRegister : handleLogin} className="auth-form">
+        <form onSubmit={showRegister && canShowRegister ? handleRegister : handleLogin} className="auth-form">
           <label className="field">
             <span>用户名</span>
             <input
@@ -111,7 +133,7 @@ export default function Login() {
               autoComplete="current-password"
             />
           </label>
-          {showRegister && (
+          {showRegister && canShowRegister && (
             <>
               <label className="field">
                 <span>姓名</span>
@@ -135,7 +157,7 @@ export default function Login() {
           {error && <div className="alert error">{error}</div>}
 
           <button className="primary-btn full" type="submit" disabled={loading}>
-            {loading ? '处理中…' : showRegister ? '注册并进入' : '登录'}
+            {loading ? '处理中…' : showRegister && canShowRegister ? '注册并进入' : '登录'}
           </button>
         </form>
 
@@ -166,7 +188,7 @@ export default function Login() {
           )}
         </div>
 
-        {role === 'teacher' && (
+        {canShowRegister && (
           <button type="button" className="text-btn" onClick={() => setShowRegister(!showRegister)}>
             {showRegister ? '已有账号，返回登录' : '没有账号？注册教师账号'}
           </button>
