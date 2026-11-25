@@ -1,8 +1,24 @@
 import { fileUrl, formatFileSize } from '../api';
-import type { TaskContent } from '../types';
+import type { TaskContent, Worksheet } from '../types';
 import MathText from './MathText';
 
-export default function TaskContentView({ content }: { content: TaskContent }) {
+// 传入 answer 时，阶段卡片内的表格与提问会变成可直接作答的输入区（学生端使用）
+export interface ContentAnswerProps {
+  worksheet: Worksheet;
+  readOnly: boolean;
+  onText: (stageIndex: number, text: string) => void;
+  onCell: (stageIndex: number, rowIndex: number, cellIndex: number, value: string) => void;
+  onAddRow: (stageIndex: number) => void;
+  onRemoveRow: (stageIndex: number, rowIndex: number) => void;
+}
+
+export default function TaskContentView({
+  content,
+  answer,
+}: {
+  content: TaskContent;
+  answer?: ContentAnswerProps;
+}) {
   return (
     <>
       {content.background && (
@@ -75,52 +91,113 @@ export default function TaskContentView({ content }: { content: TaskContent }) {
       {(content.stages || []).length > 0 && (
         <div className="content-section">
           <h2>项目进程</h2>
-          {content.stages.map((stage, index) => (
-            <div className="stage-card" key={index}>
-              <h3>
-                <MathText text={stage.title || `阶段 ${index + 1}`} />
-              </h3>
-              {stage.intro && (
-                <p className="muted small-text">
-                  <MathText text={stage.intro} />
-                </p>
-              )}
-              {stage.items.length > 0 && (
-                <ol className="stage-items">
-                  {stage.items.map((item, itemIndex) => (
-                    <li key={itemIndex}>
-                      <MathText text={item} />
-                    </li>
-                  ))}
-                </ol>
-              )}
-              {stage.columns.length > 0 && (
-                <div className="table-wrap">
-                  <table className="criteria-table stage-table">
-                    <thead>
-                      <tr>
-                        {stage.columns.map((column) => (
-                          <th key={column}>{column}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td colSpan={stage.columns.length} className="table-hint">
-                          该表格由学生在线填写
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              )}
-              {stage.prompt && (
-                <p className="stage-prompt">
-                  ✎ <MathText text={stage.prompt} />
-                </p>
-              )}
-            </div>
-          ))}
+          {content.stages.map((stage, index) => {
+            const stageAnswer = answer ? answer.worksheet.stages[index] || { text: '', rows: [] } : null;
+            return (
+              <div className="stage-card" key={index}>
+                <h3>
+                  <MathText text={stage.title || `阶段 ${index + 1}`} />
+                </h3>
+                {stage.intro && (
+                  <p className="muted small-text">
+                    <MathText text={stage.intro} />
+                  </p>
+                )}
+                {stage.items.length > 0 && (
+                  <ol className="stage-items">
+                    {stage.items.map((item, itemIndex) => (
+                      <li key={itemIndex}>
+                        <MathText text={item} />
+                      </li>
+                    ))}
+                  </ol>
+                )}
+                {stage.columns.length > 0 && (
+                  <div className="table-wrap">
+                    <table className="criteria-table input-table stage-table">
+                      <thead>
+                        <tr>
+                          {stage.columns.map((column) => (
+                            <th key={column}>{column}</th>
+                          ))}
+                          {answer && !answer.readOnly && <th style={{ width: 64 }}>操作</th>}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {!answer && (
+                          <tr>
+                            <td colSpan={stage.columns.length} className="table-hint">
+                              该表格由学生在线填写
+                            </td>
+                          </tr>
+                        )}
+                        {answer && stageAnswer.rows.length === 0 && (
+                          <tr>
+                            <td
+                              colSpan={stage.columns.length + (answer.readOnly ? 0 : 1)}
+                              className="table-hint"
+                            >
+                              点击下方“添加一行”开始记录
+                            </td>
+                          </tr>
+                        )}
+                        {answer &&
+                          stageAnswer.rows.map((row, rowIndex) => (
+                            <tr key={rowIndex}>
+                              {stage.columns.map((_, cellIndex) => (
+                                <td key={cellIndex}>
+                                  <input
+                                    className="cell-input"
+                                    value={row[cellIndex] || ''}
+                                    readOnly={answer.readOnly}
+                                    onChange={(event) =>
+                                      answer.onCell(index, rowIndex, cellIndex, event.target.value)
+                                    }
+                                  />
+                                </td>
+                              ))}
+                              {!answer.readOnly && (
+                                <td>
+                                  <button
+                                    className="tiny-btn"
+                                    type="button"
+                                    onClick={() => answer.onRemoveRow(index, rowIndex)}
+                                  >
+                                    删除
+                                  </button>
+                                </td>
+                              )}
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                {answer && stage.columns.length > 0 && !answer.readOnly && (
+                  <button className="add-btn" type="button" onClick={() => answer.onAddRow(index)}>
+                    + 添加一行
+                  </button>
+                )}
+                {stage.prompt && (
+                  <p className="stage-prompt">
+                    ✎ <MathText text={stage.prompt} />
+                  </p>
+                )}
+                {answer && (
+                  <label className="field stage-answer">
+                    <span>{stage.prompt ? '在此作答' : '本阶段作答'}</span>
+                    <textarea
+                      rows={4}
+                      value={stageAnswer.text}
+                      readOnly={answer.readOnly}
+                      placeholder="记录本阶段的做法、数据、计算与结论"
+                      onChange={(event) => answer.onText(index, event.target.value)}
+                    />
+                  </label>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 

@@ -247,91 +247,26 @@ export default function StudentTaskWorkspace() {
             </div>
           )}
 
-          <TaskContentView content={task.content} />
+          <TaskContentView
+            content={task.content}
+            answer={{
+              worksheet,
+              readOnly,
+              onText: (stageIndex, text) => updateStage(stageIndex, { text }),
+              onCell: updateCell,
+              onAddRow: (stageIndex) => addRow(stageIndex, stages[stageIndex]?.columns.length || 0),
+              onRemoveRow: (stageIndex, rowIndex) =>
+                updateStage(stageIndex, {
+                  rows: (worksheet.stages[stageIndex]?.rows || []).filter((_, r) => r !== rowIndex),
+                }),
+            }}
+          />
 
           <div className="content-section worksheet-section">
-            <h2>我的作答</h2>
+            <h2>自我评价与成果提交</h2>
             <p className="muted small-text">
-              请先在左侧任务单中阅读项目背景与阶段要求，再按阶段完成下表。可直接保存草稿，完成后提交给教师。
+              各阶段的表格与提问已在任务单中直接填写，下面完成自我评价、反思与成果附件，然后保存草稿或提交给教师。
             </p>
-
-            {stages.map((stage, stageIndex) => {
-              const answer = worksheet.stages[stageIndex] || { text: '', rows: [] };
-              return (
-                <div className="worksheet-stage" key={stageIndex}>
-                  <h3>
-                    阶段{stageIndex + 1}：{stage.title || '阶段任务'}
-                  </h3>
-                  {stage.intro && <p className="muted small-text">{stage.intro}</p>}
-                  {stage.columns.length > 0 && (
-                    <div className="table-wrap">
-                      <table className="criteria-table input-table">
-                        <thead>
-                          <tr>
-                            {stage.columns.map((column) => (
-                              <th key={column}>{column}</th>
-                            ))}
-                            {!readOnly && <th style={{ width: 60 }}>操作</th>}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {answer.rows.length === 0 && (
-                            <tr>
-                              <td colSpan={stage.columns.length + (readOnly ? 0 : 1)} className="table-hint">
-                                点击下方“添加一行”开始记录
-                              </td>
-                            </tr>
-                          )}
-                          {answer.rows.map((row, rowIndex) => (
-                            <tr key={rowIndex}>
-                              {stage.columns.map((_, cellIndex) => (
-                                <td key={cellIndex}>
-                                  <input
-                                    className="cell-input"
-                                    value={row[cellIndex] || ''}
-                                    readOnly={readOnly}
-                                    onChange={(event) => updateCell(stageIndex, rowIndex, cellIndex, event.target.value)}
-                                  />
-                                </td>
-                              ))}
-                              {!readOnly && (
-                                <td>
-                                  <button
-                                    className="tiny-btn"
-                                    type="button"
-                                    onClick={() =>
-                                      updateStage(stageIndex, { rows: answer.rows.filter((_, r) => r !== rowIndex) })
-                                    }
-                                  >
-                                    删除
-                                  </button>
-                                </td>
-                              )}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                  {stage.columns.length > 0 && !readOnly && (
-                    <button className="add-btn" type="button" onClick={() => addRow(stageIndex, stage.columns.length)}>
-                      + 添加一行
-                    </button>
-                  )}
-                  {stage.prompt && <p className="stage-prompt">✎ {stage.prompt}</p>}
-                  <label className="field">
-                    <span>本阶段作答</span>
-                    <textarea
-                      rows={5}
-                      value={answer.text}
-                      readOnly={readOnly}
-                      placeholder="记录本阶段的做法、数据、计算与结论"
-                      onChange={(event) => updateStage(stageIndex, { text: event.target.value })}
-                    />
-                  </label>
-                </div>
-              );
-            })}
 
             {rubric.length > 0 && (
               <div className="worksheet-stage">
