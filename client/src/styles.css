@@ -1711,11 +1711,12 @@ p {
 }
 
 .content-section {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 22px;
-  box-shadow: var(--shadow-sm);
+  background: var(--surface, #fff);
+  border: 1px solid #e7edf7;
+  border-radius: 14px;
+  padding: 0;
+  overflow: hidden;
+  box-shadow: 0 2px 10px rgba(24, 45, 80, 0.05);
 }
 
 .content-section h2 {
@@ -1723,50 +1724,54 @@ p {
   margin-bottom: 12px;
 }
 
-/* 可折叠板块：标题栏点击展开/收起 */
+/* 可折叠板块：整条标题栏可点击展开/收起 */
 .section-toggle {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   width: 100%;
-  padding: 0;
+  padding: 14px 20px;
   border: none;
-  background: transparent;
+  background: linear-gradient(180deg, #f9fcff 0%, #f1f7fe 100%);
   cursor: pointer;
   text-align: left;
   font-family: inherit;
+  transition: background 0.18s ease;
+}
+
+.section-toggle:hover {
+  background: linear-gradient(180deg, #f3f9ff 0%, #e8f2fe 100%);
 }
 
 .section-caret {
   flex: none;
-  width: 18px;
-  height: 18px;
+  width: 22px;
+  height: 22px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: var(--brand-soft, #e8f4fd);
-  color: var(--brand, #1a73c8);
+  background: #1a73c8;
+  color: #fff;
   font-size: 9px;
   line-height: 1;
+  box-shadow: 0 2px 6px rgba(26, 115, 200, 0.28);
 }
 
 .section-title {
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 700;
-  color: var(--ink, #1b2333);
+  color: #1b2333;
+  letter-spacing: 0.2px;
 }
 
 .section-body {
-  margin-top: 12px;
-}
-
-.collapsible:not(.open) {
-  padding-bottom: 16px;
+  padding: 18px 20px 20px;
+  border-top: 1px solid #eef3fa;
 }
 
 .intro-block + .intro-block {
-  margin-top: 14px;
+  margin-top: 16px;
 }
 
 .info-grid {
@@ -1806,6 +1811,14 @@ p {
   font-size: 14px;
   margin: 12px 0 6px;
   color: #3d4760;
+}
+
+.section-body > .intro-block:first-child h3 {
+  margin-top: 0;
+}
+
+.stage-card:last-child {
+  margin-bottom: 0;
 }
 
 .objective-list {

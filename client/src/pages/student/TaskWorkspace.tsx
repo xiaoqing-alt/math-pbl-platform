@@ -429,8 +429,7 @@ export default function StudentTaskWorkspace() {
             }}
           />
 
-          <div className="content-section worksheet-section">
-            <h2>自我评价与成果提交</h2>
+          <ContentSection title="自我评价与成果提交">
             <p className="muted small-text">
               各阶段的表格与提问已在任务单中直接填写，下面完成自我评价、反思与成果附件，然后保存草稿或提交给教师。
             </p>
@@ -570,6 +569,7 @@ export default function StudentTaskWorkspace() {
                 {uploading && <span className="muted small-text">上传中…</span>}
               </div>
             </div>
+          </ContentSection>
 
             <div className="submission-status">
               <StatusBadge
@@ -630,7 +630,6 @@ export default function StudentTaskWorkspace() {
                 )}
               </div>
             )}
-          </div>
         </div>
 
         <aside className="workspace-side workspace-side-ai">
