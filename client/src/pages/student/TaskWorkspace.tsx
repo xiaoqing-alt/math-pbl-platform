@@ -270,7 +270,7 @@ export default function StudentTaskWorkspace() {
 
             {rubric.length > 0 && (
               <div className="worksheet-stage">
-                <h3>自我评价</h3>
+                <h3>自评量表</h3>
                 <div className="table-wrap">
                   <table className="criteria-table self-eval-table">
                     <thead>
