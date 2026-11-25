@@ -48,6 +48,13 @@ function createPool(useSsl) {
 
 if (USE_POSTGRES) {
   const useSsl = !DATABASE_URL.includes('sslmode=disable');
+  // 启动时打印运行时拿到的真实主机名，便于排查 Railway 服务引用/DNS 问题
+  try {
+    const parsed = new URL(DATABASE_URL);
+    console.log('[pg] connecting to host=', parsed.host, 'ssl=', useSsl);
+  } catch {
+    console.log('[pg] DATABASE_URL 无法解析:', DATABASE_URL.slice(0, 30));
+  }
   pool = createPool(useSsl);
   pool.on('error', (err) => {
     console.error('[pg pool error]', err && err.message ? err.message : err);
