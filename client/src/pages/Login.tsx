@@ -8,22 +8,27 @@ interface LoginResponse {
   user: User;
 }
 
-function useRegistrationEnabled() {
-  const [enabled, setEnabled] = useState<boolean | null>(null);
+function useAuthConfig() {
+  const [config, setConfig] = useState<{ registrationEnabled: boolean; inviteRequired: boolean } | null>(null);
   useEffect(() => {
     let mounted = true;
-    api<{ registrationEnabled: boolean }>('/auth/config', { auth: false })
+    api<{ registrationEnabled: boolean; inviteRequired?: boolean }>('/auth/config', { auth: false })
       .then((cfg) => {
-        if (mounted) setEnabled(Boolean(cfg && cfg.registrationEnabled));
+        if (mounted) {
+          setConfig({
+            registrationEnabled: Boolean(cfg && cfg.registrationEnabled),
+            inviteRequired: Boolean(cfg && cfg.inviteRequired),
+          });
+        }
       })
       .catch(() => {
-        if (mounted) setEnabled(false);
+        if (mounted) setConfig({ registrationEnabled: false, inviteRequired: false });
       });
     return () => {
       mounted = false;
     };
   }, []);
-  return enabled;
+  return config;
 }
 
 export default function Login() {
@@ -31,7 +36,9 @@ export default function Login() {
   const role = (params.role === 'student' ? 'student' : 'teacher') as Role;
   const navigate = useNavigate();
   const existing = getUser();
-  const registrationEnabled = useRegistrationEnabled();
+  const config = useAuthConfig();
+  const registrationEnabled = config ? config.registrationEnabled : null;
+  const inviteRequired = Boolean(config && config.inviteRequired);
 
   const [username, setUsername] = useState(role === 'teacher' ? 'teacher' : 'student');
   const [password, setPassword] = useState('123456');
@@ -83,7 +90,7 @@ export default function Login() {
     }
   }
 
-  // 注册入口仅在后端配置了邀请码时才展示，避免引导用户进入注定失败的流程
+  // 教师端始终可自助注册；若平台配置了邀请码，注册表单会多出邀请码一栏
   const canShowRegister = role === 'teacher' && registrationEnabled === true;
 
   return (
@@ -143,14 +150,16 @@ export default function Login() {
                   placeholder="例如：李老师"
                 />
               </label>
-              <label className="field">
-                <span>教师邀请码</span>
-                <input
-                  value={inviteCode}
-                  onChange={(event) => setInviteCode(event.target.value)}
-                  placeholder="向平台管理员索取"
-                />
-              </label>
+              {inviteRequired && (
+                <label className="field">
+                  <span>教师邀请码</span>
+                  <input
+                    value={inviteCode}
+                    onChange={(event) => setInviteCode(event.target.value)}
+                    placeholder="向平台管理员索取"
+                  />
+                </label>
+              )}
             </>
           )}
 

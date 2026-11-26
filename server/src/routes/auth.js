@@ -7,7 +7,9 @@ const router = createRouter();
 router.get('/config', (req, res) => {
   const inviteCode = String(process.env.TEACHER_INVITE_CODE || '').trim();
   res.json({
-    registrationEnabled: Boolean(inviteCode),
+    // 教师可自助注册；若管理员配置了邀请码，则注册时需填写
+    registrationEnabled: true,
+    inviteRequired: Boolean(inviteCode),
   });
 });
 
@@ -21,10 +23,8 @@ router.post('/register', async (req, res) => {
     return res.status(403).json({ message: '学生账号由教师创建，平台不开放学生自助注册' });
   }
   const inviteCode = String(process.env.TEACHER_INVITE_CODE || '').trim();
-  if (!inviteCode) {
-    return res.status(403).json({ message: '平台暂未开放教师自助注册，请联系管理员开通账号' });
-  }
-  if (String(req.body.inviteCode || '').trim() !== inviteCode) {
+  // 未配置邀请码时开放教师自助注册；配置后仍需校验邀请码
+  if (inviteCode && String(req.body.inviteCode || '').trim() !== inviteCode) {
     return res.status(403).json({ message: '教师邀请码不正确' });
   }
   if (!username) return res.status(400).json({ message: '用户名不能为空' });
