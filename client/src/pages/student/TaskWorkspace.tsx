@@ -416,6 +416,8 @@ export default function StudentTaskWorkspace() {
 
           <TaskContentView
             content={task.content}
+            coverImage={task.coverImage}
+            coverCaption={task.title}
             answer={{
               worksheet,
               readOnly,

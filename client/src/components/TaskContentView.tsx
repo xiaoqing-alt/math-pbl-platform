@@ -38,9 +38,13 @@ export function ContentSection({
 export default function TaskContentView({
   content,
   answer,
+  coverImage,
+  coverCaption,
 }: {
   content: TaskContent;
   answer?: ContentAnswerProps;
+  coverImage?: string;
+  coverCaption?: string;
 }) {
   const hasIntro = Boolean(
     content.background ||
@@ -51,11 +55,22 @@ export default function TaskContentView({
 
   return (
     <>
+      {coverImage && (
+        <div className="task-cover">
+          <img src={fileUrl(coverImage)} alt="封面" />
+          {coverCaption && (
+            <div className="task-cover-caption">
+              <h1>{coverCaption}</h1>
+            </div>
+          )}
+        </div>
+      )}
+
       {hasIntro && (
         <ContentSection title="项目简介">
           {content.background && (
-            <div className="intro-block">
-              <h3>项目背景</h3>
+            <div className="intro-block background">
+              <h3 data-ico="①">项目背景</h3>
               <p className="prose">
                 <MathText text={content.background} />
               </p>
@@ -63,8 +78,8 @@ export default function TaskContentView({
           )}
 
           {(content.objectives || []).length > 0 && (
-            <div className="intro-block">
-              <h3>项目目标</h3>
+            <div className="intro-block objectives">
+              <h3 data-ico="②">项目目标</h3>
               <ul className="objective-list">
                 {content.objectives.map((item, index) => (
                   <li key={`${item}-${index}`}>
@@ -76,8 +91,8 @@ export default function TaskContentView({
           )}
 
           {(content.knowledgeTags || []).length > 0 && (
-            <div className="intro-block">
-              <h3>涉及知识</h3>
+            <div className="intro-block knowledge">
+              <h3 data-ico="③">涉及知识</h3>
               <div className="tag-list">
                 {content.knowledgeTags.map((tag) => (
                   <span className="knowledge-tag" key={tag}>
@@ -89,8 +104,8 @@ export default function TaskContentView({
           )}
 
           {content.description && (
-            <div className="intro-block">
-              <h3>驱动问题与成果要求</h3>
+            <div className="intro-block desc">
+              <h3 data-ico="④">驱动问题与成果要求</h3>
               <p className="prose">
                 <MathText text={content.description} />
               </p>
