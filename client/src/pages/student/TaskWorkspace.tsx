@@ -506,29 +506,29 @@ export default function StudentTaskWorkspace() {
               </div>
             )}
 
-            {(task.content.reflections || []).length > 0 && (
-              <div className="worksheet-stage">
-                <h3>总结与反思</h3>
-                <label className="field">
-                  <span>{task.content.reflections[0] || '本次项目的收获'}</span>
-                  <textarea
-                    rows={4}
-                    value={worksheet.gains}
-                    readOnly={readOnly}
-                    onChange={(event) => setWorksheet({ ...worksheet, gains: event.target.value })}
-                  />
-                </label>
-                <label className="field">
-                  <span>{task.content.reflections[1] || '遇到的困难及改进思路'}</span>
-                  <textarea
-                    rows={4}
-                    value={worksheet.difficulties}
-                    readOnly={readOnly}
-                    onChange={(event) => setWorksheet({ ...worksheet, difficulties: event.target.value })}
-                  />
-                </label>
-              </div>
-            )}
+            <div className="worksheet-stage">
+              <h3>总结与反思</h3>
+              <label className="field">
+                <span>本次项目的收获</span>
+                <textarea
+                  rows={4}
+                  value={worksheet.gains}
+                  readOnly={readOnly}
+                  placeholder="从数学知识、调查实践、小组合作等方面，写下你在这次项目中的收获。"
+                  onChange={(event) => setWorksheet({ ...worksheet, gains: event.target.value })}
+                />
+              </label>
+              <label className="field">
+                <span>遇到的困难及改进思路</span>
+                <textarea
+                  rows={4}
+                  value={worksheet.difficulties}
+                  readOnly={readOnly}
+                  placeholder="记录测量、调查或小组合作中遇到的困难，以及下次打算如何改进。"
+                  onChange={(event) => setWorksheet({ ...worksheet, difficulties: event.target.value })}
+                />
+              </label>
+            </div>
 
             <div className="worksheet-stage">
               <h3>成果概述与附件</h3>
@@ -640,7 +640,8 @@ export default function StudentTaskWorkspace() {
               提交概览
             </button>
             <button className={`side-tab${tab === 'ai' ? ' active' : ''}`} type="button" onClick={() => setTab('ai')}>
-              AI 辅助{ai.enabled ? '' : '（未开启）'}
+              {ai.tools.length > 0 ? '探究工具' : 'AI 辅助'}
+              {ai.enabled ? '' : ai.tools.length > 0 ? ' / AI 未开启' : '（未开启）'}
             </button>
           </div>
 
@@ -689,17 +690,11 @@ export default function StudentTaskWorkspace() {
 
           {tab === 'ai' && (
             <div className="side-tab-panel">
-              {!ai.enabled ? (
-                <div className="ai-empty">
-                  教师尚未开启这份任务单的 AI 辅助功能。
-                  <br />
-                  你仍然可以按照任务单中的阶段要求自主完成探究。
-                </div>
-              ) : (
-                <>
-                  <p className="muted small-text" style={{ marginBottom: 10 }}>
-                    AI 工具来自教师选择的工具库，点“写入我的作答”即可把结果写进成果。
-                  </p>
+              <p className="muted small-text" style={{ marginBottom: 10 }}>
+                {ai.tools.length > 0
+                  ? '教师为本任务挑选了交互探究教具，可直接操作，并把结果写入你的作答。'
+                  : '教师尚未为这份任务单选择交互工具。'}
+              </p>
 
                   {(ai.tools || []).length > 0 && (
                     <>
@@ -752,6 +747,8 @@ export default function StudentTaskWorkspace() {
                     </div>
                   )}
 
+                  {ai.enabled ? (
+                    <>
                   <div className="ai-section">
                     <h4>AI 成果评价</h4>
                     <EvaluationPanel evaluation={evaluation} evaluating={evaluating} onEvaluate={runEvaluation} />
@@ -808,8 +805,12 @@ export default function StudentTaskWorkspace() {
                       </div>
                     )}
                   </div>
-                </>
-              )}
+                    </>
+                  ) : (
+                    <div className="ai-empty">
+                      教师尚未开启这份任务单的 AI 辅助功能，你仍可按照阶段要求自主完成探究。
+                    </div>
+                  )}
             </div>
           )}
         </aside>

@@ -3460,3 +3460,246 @@ p {
     padding: 0;
   }
 }
+
+/* ========== 任务单阅读版式（终版覆写） ========== */
+.workspace-main {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.content-section {
+  background: #fff;
+  border: 1px solid #e8edf6;
+  border-radius: 12px;
+  padding: 0;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(24, 45, 80, 0.04);
+}
+
+.section-toggle {
+  padding: 13px 18px;
+  background: #fff;
+  border-bottom: 1px solid #f1f4fa;
+  gap: 9px;
+  border-radius: 0;
+}
+
+.section-toggle::before {
+  content: '';
+  flex: none;
+  width: 3px;
+  height: 15px;
+  border-radius: 2px;
+  background: #2f6fc4;
+}
+
+.section-toggle:hover {
+  background: #f8fafd;
+}
+
+.collapsible:not(.open) .section-toggle {
+  border-bottom: none;
+}
+
+.section-title {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: #1c2537;
+  letter-spacing: 0.2px;
+}
+
+.section-caret {
+  order: 3;
+  margin-left: auto;
+  width: auto;
+  height: auto;
+  background: none;
+  color: #9aa4b6;
+  font-size: 9px;
+  border-radius: 0;
+}
+
+.section-body {
+  padding: 18px 20px 20px;
+}
+
+.content-section .section-body {
+  font-size: 13.8px;
+  line-height: 1.85;
+  color: #3a455a;
+}
+
+/* 项目简介：去卡片化，改为左色条小标题 */
+.intro-block {
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: 0;
+}
+
+.intro-block + .intro-block {
+  margin-top: 20px;
+}
+
+.intro-block h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 7px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #22304a;
+}
+
+.intro-block h3::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 2px;
+  background: #2f6fc4;
+}
+
+.intro-block.background h3::before { background: #4a7dd8; }
+.intro-block.objectives h3::before { background: #2ea27b; }
+.intro-block.knowledge h3::before { background: #d89538; }
+.intro-block.desc h3::before { background: #9062c7; }
+
+.intro-block p.prose,
+.intro-block ul.objective-list {
+  margin: 0;
+  padding-left: 14px;
+  font-size: 13.8px;
+  line-height: 1.85;
+  color: #3a455a;
+}
+
+.intro-block p.prose {
+  padding-left: 0;
+}
+
+.intro-block ul.objective-list li {
+  margin-bottom: 4px;
+}
+
+.knowledge-tag {
+  display: inline-block;
+  padding: 3px 10px;
+  margin: 2px 6px 4px 0;
+  background: #f1f6fd;
+  border: 1px solid #dfeafa;
+  border-radius: 12px;
+  font-size: 12px;
+  color: #38618f;
+}
+
+/* 阶段卡片：白底细边，标题带蓝条 */
+.stage-card {
+  background: #fff;
+  border: 1px solid #e9eef7;
+  border-radius: 10px;
+  padding: 15px 16px;
+  margin-bottom: 12px;
+  box-shadow: none;
+}
+
+.stage-card h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2c44;
+  margin: 0 0 10px;
+}
+
+.stage-card h3::before {
+  content: '';
+  width: 3px;
+  height: 14px;
+  border-radius: 2px;
+  background: #2f6fc4;
+}
+
+.stage-items {
+  margin: 0 0 10px;
+  padding-left: 20px;
+  font-size: 13.5px;
+  line-height: 1.8;
+  color: #3a455a;
+}
+
+.stage-prompt {
+  background: #fffaf0;
+  border-left: 3px solid #f0b93d;
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin: 10px 0;
+  font-size: 13px;
+  color: #6b5417;
+}
+
+.criteria-table th {
+  background: #f7f9fd;
+  color: #6b7688;
+  font-weight: 600;
+  font-size: 12px;
+  border-bottom: 1px solid #eaeff7;
+}
+
+.criteria-table td {
+  font-size: 13px;
+  border-bottom: 1px solid #f0f3f9;
+}
+
+.cell-input {
+  border: 1px solid #e2e9f4;
+  border-radius: 6px;
+  background: #fdfefe;
+}
+
+.cell-input:focus {
+  outline: none;
+  border-color: #2f6fc4;
+  box-shadow: 0 0 0 2px rgba(47, 111, 196, 0.1);
+}
+
+/* 基础信息 */
+.info-grid .field span {
+  font-size: 12.5px;
+  color: #6b7688;
+}
+
+.info-subtitle {
+  margin: 20px 0 10px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #22304a;
+}
+
+.info-subtitle::before {
+  background: #2f6fc4;
+}
+
+/* 底部编辑区小标题与表单 */
+.worksheet-stage h3 {
+  font-size: 14px;
+}
+
+.worksheet-stage {
+  border: 1px solid #eef2f9;
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  background: #fdfefe;
+}
+
+/* 封面 */
+.task-cover {
+  border-radius: 12px;
+  aspect-ratio: 16 / 5;
+}
+
+.task-cover-caption h1 {
+  font-size: 20px;
+}

@@ -202,7 +202,8 @@ router.get('/assignments/:id', async (req, res) => {
     ai: {
       enabled: task.aiEnabled,
       skills: enabledSkills,
-      tools: task.aiEnabled ? await serializeTools(task.content.toolKeys) : [],
+      // 交互探究教具独立于 AI 开关，教师选中后学生端始终可见
+      tools: await serializeTools(task.content.toolKeys),
     },
   });
 });
